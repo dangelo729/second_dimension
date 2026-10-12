@@ -79,6 +79,38 @@ smooth as the pieces turn.
 A piece drawn with its own white outline still converts and draws, but in a
 group that outline becomes interior detail wherever another piece covers it.
 
+### Outlined art: `--silhouette`
+
+An artist may draw a group piece solid, as above, or draw it the usual way,
+a closed white outline on an opaque black background with details inside,
+and convert it with `--silhouette`:
+
+```sh
+python3 tools/png2sprite.py art/*.png --silhouette art/head.png -o Body.h
+```
+
+The option names a PNG among those given (repeat it for several); the
+others convert as always. That PNG is read as below, and then:
+
+1. **The background is unpainted:** every pixel that reads as the top-left
+   pixel does (black here) and is 4-connected to the image's border
+   through pixels that read so. One that is not, the inside of a closed
+   outline, stays painted black.
+2. **The outline is the shape's edge, not detail:** every ink pixel with a
+   4-neighbour unpainted after step 1, or outside the image, is painted
+   black (mask only). That is the ring the group derives, so the piece
+   drawn alone gives back the drawing's outline pixel for pixel, and
+   another piece over it leaves no line. One ring is peeled, never a
+   second: an outline pixel that touches the background only at a corner
+   (where the outline turns inward) stays ink, and the group draws it as
+   it was drawn.
+
+The pivot pixel paints as its colour says, in neither step. A PNG whose
+top-left pixel is unpainted (alpha 0) already has its background unpainted
+and converts as it would without the option. The outline must be closed:
+a gap lets the background in, and a PNG left with nothing inside an
+outline is refused. The banner and the printout say what the option did.
+
 ## What the converter does (the contract)
 
 Stable across tool versions; the host suite pins it.
@@ -132,7 +164,9 @@ header written, rather than a misread:
 - an unknown critical chunk, a bad CRC, a truncated file, a missing
   palette, a palette index past the palette;
 - a second pivot pixel (`#ff00ff` or `#800080` at any alpha but 0);
-- a side over 32767 pixels (`SD_Sprite` sizes are `int16_t`).
+- a side over 32767 pixels (`SD_Sprite` sizes are `int16_t`);
+- under `--silhouette`, nothing left inside an outline (a gap in it), and
+  a `--silhouette` PNG that is not among those given.
 
 Ancillary chunks (text, gamma, colour profiles and the like) are skipped.
 

@@ -37,6 +37,12 @@ called out under a "Breaking" heading.
 - **The art convention for a group piece** (`extras/docs/asset-pipeline.md`,
   `extras/docs/conventions.md` R8): the mask is the solid shape, the ink interior
   detail only; the outline is derived.
+- **The converter's `--silhouette <png>`** (`tools/png2sprite.py`, `asset-pipeline.md`):
+  an outline drawn on an opaque background converts to a group piece, its
+  border-connected background unpainted and its outline's one ring painted black, so the
+  group derives it back (a drawing whose top-left pixel is unpainted converts as without
+  it; one with nothing left inside an outline is refused); `test_convert.cpp` adds
+  `outlined.png` and `outlined_gap.png`, no pin moved.
 - **The group suite** (`test/host/test_group.cpp`): the silhouette and the ink are
   `sd_draw`'s plotted and lit pixels for every fixture at the golden poses; a lone
   rectangle is a 1 px outline round a dark inside; two overlapping rectangles give one

@@ -9,9 +9,15 @@
 // (opaque #800080) and left unpainted (either colour at alpha 1..254) leave
 // the shoulder pixel black and clear; reading.png pins the frozen colour
 // reading pixel by pixel; 16-bit, interlaced, unknown-critical-chunk and
-// two-pivot pngs are refused with a message and no output. the pinned header
-// itself is compiled in: it validates, its planes are the mockup's arm, and
-// drawn at the mockup's angles it is the mockup's frame.
+// two-pivot pngs are refused with a message and no output. --silhouette:
+// outlined.png (an opaque rgb drawing like daedalus's head, a closed 1 px
+// outline on black touching all four edges, a face inside) converts to the
+// filled shape with only the face in ink, and drawn alone as a group gives
+// back the plain conversion's pixels; outlined_gap.png (one outline pixel
+// black) is refused; arm.png (alpha outside) converts to the pinned planes;
+// a png not among those given is refused. the pinned header itself is
+// compiled in: it validates, its planes are the mockup's arm, and drawn at
+// the mockup's angles it is the mockup's frame.
 
 #include <stdlib.h>
 #include <string.h>
@@ -23,6 +29,8 @@
 
 #include "SD_Canvas.h"
 #include "SD_Draw.h"
+#include "SD_Group.h"
+#include "SD_Rig.h"
 #include "SD_Sprite.h"
 
 #include "fixtures/arm_expected.h"
@@ -71,6 +79,73 @@ static std::string block(const std::string &text, const std::string &start) {
   if (b == std::string::npos) return std::string();
   return text.substr(a, b + 2 - a);
 }
+
+// a sprite read back from a header the converter wrote: its planes as
+// exact-size heap copies (so asan sees any read past one) and its view.
+struct Parsed {
+  std::vector<uint8_t> ink, mask;
+  int w, h, px, py;
+  bool ok;
+  SD_Sprite view() const {
+    return {(int16_t)w, (int16_t)h, (int16_t)px, (int16_t)py, ok ? ink.data() : nullptr,
+            ok ? mask.data() : nullptr};
+  }
+};
+
+static std::vector<uint8_t> planeBytes(const std::string &text, const std::string &sym) {
+  std::vector<uint8_t> out;
+  const std::string b = block(text, "static const uint8_t " + sym + "[");
+  for (size_t at = b.find("0x"); at != std::string::npos; at = b.find("0x", at + 2))
+    out.push_back((uint8_t)std::strtoul(b.c_str() + at, nullptr, 16));
+  return out;
+}
+
+static Parsed parsed(const std::string &text, const std::string &name) {
+  Parsed p;
+  p.ink = planeBytes(text, name + "_ink");
+  p.mask = planeBytes(text, name + "_mask");
+  p.w = p.h = p.px = p.py = 0;
+  const size_t at = text.find("static const SD_Sprite " + name + " = {");
+  p.ok = at != std::string::npos &&
+         std::sscanf(text.c_str() + text.find('{', at), "{ %d, %d, %d, %d,", &p.w, &p.h, &p.px,
+                     &p.py) == 4 &&
+         p.w > 0 && p.h > 0 && p.ink.size() == (size_t)((p.w + 7) / 8 * p.h) &&
+         p.mask.size() == p.ink.size();
+  return p;
+}
+
+// the --silhouette fixture as drawn ('#' white, '-' black, opaque), and as
+// the option reads it: the background unpainted, the outline black, the
+// face the only ink.
+const ArtFixture kOutlined("outlined",
+                           {
+                               "-----######-----",
+                               "---##------##---",
+                               "--#----------#--",
+                               "-#---##--##---#-",
+                               "-#------------#-",
+                               "#------#-------#",
+                               "-#-----#------#-",
+                               "-#---#####----#-",
+                               "--##--------##--",
+                               "----########----",
+                           },
+                           8, 5);
+
+const ArtFixture kOutlinedSolid("outlined_solid",
+                                {
+                                    ".....------.....",
+                                    "...----------...",
+                                    "..------------..",
+                                    ".----##--##----.",
+                                    ".--------------.",
+                                    "-------#--------",
+                                    ".------#-------.",
+                                    ".----#####-----.",
+                                    "..------------..",
+                                    "....--------....",
+                                },
+                                8, 5);
 
 struct Converter {
   std::string dir;
@@ -285,6 +360,86 @@ void runConvertTests() {
           "Body.h: arm planes differ from the single-png header");
     const int rc2 = cv.run("arm.png mallet.png", "Named.h", "--name both", &err);
     CHECK(rc2 != 0, "--name with two pngs should be refused");
+  }
+
+  // ---- --silhouette: an outline on black becomes a group piece ----
+  {
+    std::string err;
+    const int rc = cv.run("outlined.png", "outlined.h", "", &err);
+    CHECK(rc == 0, "outlined.png: converter exited %d: %s", rc, err.c_str());
+    const Parsed plain = parsed(cv.output("outlined.h", &ok), "outlined");
+    CHECK(plain.ok && plain.ink.size() == 20 && memcmp(plain.ink.data(), kOutlined.ink, 20) == 0 &&
+              memcmp(plain.mask.data(), kOutlined.mask, 20) == 0,
+          "outlined.png: read plainly, it is not the drawing the suite describes");
+
+    const int rc2 = cv.run("outlined.png", "outlined_solid.h",
+                           "--silhouette '" + std::string(kFixtureDir) + "outlined.png'", &err);
+    CHECK(rc2 == 0, "outlined.png --silhouette: converter exited %d: %s", rc2, err.c_str());
+    const std::string text = cv.output("outlined_solid.h", &ok);
+    const Parsed solid = parsed(text, "outlined");
+    CHECK(solid.ok && solid.mask.size() == 20 &&
+              memcmp(solid.mask.data(), kOutlinedSolid.mask, 20) == 0,
+          "outlined.png --silhouette: the mask is not the filled shape");
+    CHECK(solid.ok && solid.ink.size() == 20 &&
+              memcmp(solid.ink.data(), kOutlinedSolid.ink, 20) == 0,
+          "outlined.png --silhouette: the ink is not the face alone");
+    CHECK(solid.ok && solid.w == 16 && solid.h == 10 && solid.px == 8 && solid.py == 5,
+          "outlined.png --silhouette: size or pivot moved");
+    CHECK(text.find("//   --silhouette: 40 px of background unpainted, 34 px of outline painted "
+                    "black.") != std::string::npos,
+          "outlined.png --silhouette: the banner does not name the option");
+
+    // drawn alone as a group, the solid piece gives back the outline: the
+    // same canvas as the plain conversion drawn by sd_draw
+    const SD_Sprite plainView = plain.view(), solidView = solid.view();
+    for (int qi = 0; qi < 2; ++qi) {
+      const SD_Sample q = qi == 0 ? SD_SAMPLE_1 : SD_SAMPLE_2x2;
+      OwnedCanvas want(32, 20), got(32, 20), sil(32, 20), ink(32, 20);
+      want.canvas.clear(false);
+      got.canvas.clear(false);
+      sd_draw(want.canvas, plainView, SD_Xform::rigid(12.0f, 9.0f, 0.0f), q);
+      SD_Bone bone[1] = {{-1, 12.0f, 9.0f, 0.0f, false, false, &solidView}};
+      SD_Xform world[1];
+      SD_Rig rig(bone, world, 1);
+      const int list[1] = {0};
+      CHECK(rig.pose() && sd_drawGroup(got.canvas, rig, bone, list, 1, sil.canvas, ink.canvas, q),
+            "outlined.png --silhouette: the group did not draw");
+      writeFrame(got.canvas, qi == 0 ? "convert_silhouette_1" : "convert_silhouette_2x2");
+      CHECK(memcmp(want.canvas.buffer(), got.canvas.buffer(), want.canvas.bytes()) == 0,
+            "outlined.png --silhouette, drawn as a group (sample %d): not the outline drawn", qi);
+    }
+  }
+
+  // ---- --silhouette: a gap in the outline is refused ----
+  {
+    std::string err;
+    const int rc = cv.run("outlined_gap.png", "outlined_gap.h",
+                          "--silhouette '" + std::string(kFixtureDir) + "outlined_gap.png'", &err);
+    CHECK(rc != 0, "outlined_gap.png --silhouette: should be refused, converter exited 0");
+    CHECK(err.find("nothing inside an outline") != std::string::npos,
+          "outlined_gap.png --silhouette: message should say \"nothing inside an outline\", said: %s",
+          err.c_str());
+    CHECK(!exists(cv.dir + "/outlined_gap.h"), "outlined_gap.png: a refused conversion wrote a header");
+  }
+
+  // ---- --silhouette: a drawing with alpha outside is read as is ----
+  {
+    std::string err;
+    const int rc = cv.run("arm.png", "arm_silhouette.h",
+                          "--name arm --silhouette '" + std::string(kFixtureDir) + "arm.png'", &err);
+    CHECK(rc == 0, "arm.png --silhouette: converter exited %d: %s", rc, err.c_str());
+    const std::string got = cv.output("arm_silhouette.h", &ok);
+    CHECK(block(got, "static const uint8_t arm_ink[") == pinnedInk &&
+              block(got, "static const uint8_t arm_mask[") == pinnedMask &&
+              got.find("static const SD_Sprite arm = { 16, 7, 0, 3, arm_ink, arm_mask };") !=
+                  std::string::npos,
+          "arm.png --silhouette: the planes or the sprite differ from the pinned header's");
+    CHECK(got.find("--silhouette: its background transparent already, read as is.") !=
+              std::string::npos,
+          "arm.png --silhouette: the banner should say it was read as is");
+    const int rc2 = cv.run("arm.png", "arm_other.h", "--silhouette 'fixtures/mallet.png'", &err);
+    CHECK(rc2 != 0 && err.find("not one of the pngs given") != std::string::npos,
+          "--silhouette naming a png not given should be refused, said: %s", err.c_str());
   }
 
   // ---- the pinned header, compiled in ----

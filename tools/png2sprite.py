@@ -34,6 +34,23 @@ what it does:
 
 names: --name sets the symbol when one png is given; with several, each
 sprite is named for its file stem, made into a c identifier.
+
+--silhouette <png> (once per png it names, one of those given): the png is
+an outline drawn on an opaque background, details inside, and becomes a
+group piece (a solid shape, its ink interior detail only), read as above
+and then:
+  a. the background is unpainted: every pixel that reads as the top-left
+     pixel does (black, say) and is 4-connected to the image's border
+     through pixels that read so. one that is not (the inside of a closed
+     outline) stays painted.
+  b. the outline is the shape's edge, not detail: every ink pixel with a
+     4-neighbour unpainted after a (or outside the image) is painted black,
+     so a group derives the same ring back. one ring is peeled, never a
+     second.
+  the pivot pixel paints as its colour says, in neither step. a png whose
+  top-left pixel is unpainted (alpha 0) already has its background
+  unpainted and is read as is. a png with nothing left inside an outline
+  after a is refused: a gap in the outline lets the background in.
 """
 import argparse
 import os
@@ -197,7 +214,56 @@ def decode_png(data):
     return w, h, pixels
 
 
-def read_sprite(path, name):
+def to_silhouette(w, h, stride, ink, mask, keep):
+    """the --silhouette reading, on the planes in place (keep, the pivot
+    pixel or None, untouched). returns (unpainted, peeled), the pixels each
+    step changed, or None when nothing is left inside an outline."""
+    def reading(x, y):  # 0 unpainted, 1 black, 2 ink
+        at, bit = y * stride + x // 8, 0x80 >> (x & 7)
+        if not mask[at] & bit:
+            return 0
+        return 2 if ink[at] & bit else 1
+
+    def clear(plane, x, y):
+        plane[y * stride + x // 8] &= ~(0x80 >> (x & 7)) & 0xFF
+
+    back = reading(0, 0)
+    if back == 0:
+        return (0, 0)
+    out = bytearray(w * h)  # 1 where step a unpaints
+    todo = [(x, y) for y in range(h) for x in range(w)
+            if (x in (0, w - 1) or y in (0, h - 1)) and (x, y) != keep and reading(x, y) == back]
+    for x, y in todo:
+        out[y * w + x] = 1
+    while todo:
+        x, y = todo.pop()
+        for u, v in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+            if 0 <= u < w and 0 <= v < h and not out[v * w + u] and (u, v) != keep \
+                    and reading(u, v) == back:
+                out[v * w + u] = 1
+                todo.append((u, v))
+    unpainted = 0
+    for y in range(h):
+        for x in range(w):
+            if out[y * w + x]:
+                clear(mask, x, y)
+                clear(ink, x, y)
+                unpainted += 1
+    if not any(reading(x, y) == back and (x, y) != keep for y in range(h) for x in range(w)):
+        return None
+
+    def bare(x, y):
+        return x < 0 or y < 0 or x >= w or y >= h or reading(x, y) == 0
+
+    ring = [(x, y) for y in range(h) for x in range(w)
+            if (x, y) != keep and reading(x, y) == 2
+            and (bare(x - 1, y) or bare(x + 1, y) or bare(x, y - 1) or bare(x, y + 1))]
+    for x, y in ring:
+        clear(ink, x, y)
+    return (unpainted, len(ring))
+
+
+def read_sprite(path, name, silhouette=False):
     """converts one png; returns a dict describing the sprite, or exits."""
     try:
         with open(path, "rb") as fp:
@@ -239,11 +305,28 @@ def read_sprite(path, name):
             if white:
                 ink[at] |= bit
                 inked += 1
+    sil = None
+    if silhouette:
+        sil = to_silhouette(w, h, stride, ink, mask, pivot)
+        if sil is None:
+            sys.exit(f"{path}: refused: --silhouette left nothing inside an outline;"
+                     " a gap in the outline lets the background in: close it")
+        painted = sum(bin(v).count("1") for v in mask)
+        inked = sum(bin(v).count("1") for v in ink)
     if pivot is None:
         pivot = (w // 2, h // 2)
     return {"path": path, "src": os.path.basename(path), "name": name, "w": w, "h": h,
             "stride": stride, "pivot": pivot, "kind": kind, "ink": ink,
-            "mask": mask, "painted": painted, "inked": inked}
+            "mask": mask, "painted": painted, "inked": inked, "silhouette": sil}
+
+
+def silhouette_note(sp):
+    """what --silhouette did to a sprite, for the banner and the printout."""
+    unpainted, peeled = sp["silhouette"]
+    if unpainted == 0 and peeled == 0:
+        return "--silhouette: its background transparent already, read as is"
+    return (f"--silhouette: {unpainted} px of background unpainted,"
+            f" {peeled} px of outline painted black")
 
 
 def identifier(stem):
@@ -274,6 +357,8 @@ def emit(sprites, out):
         how = f"its {sp['kind']}" if sp["kind"] else "the centre, no pivot pixel"
         lines.append(f"// {sp['name']}: {sp['src']}, {sp['w']}x{sp['h']},"
                      f" pivot ({sp['pivot'][0]}, {sp['pivot'][1]}) from {how}.")
+        if sp["silhouette"] is not None:
+            lines.append(f"//   {silhouette_note(sp)}.")
     lines.append(f"#ifndef {guard}")
     lines.append(f"#define {guard}")
     lines.append("")
@@ -306,7 +391,17 @@ def main():
     ap.add_argument("--name",
                     help="c identifier for the sprite when one png is given"
                          " (default: the file stem)")
+    ap.add_argument("--silhouette", action="append", default=[], metavar="PNG",
+                    help="this png, one of those given, is an outline on an opaque background:"
+                         " its background unpainted and its outline painted black, a group"
+                         " piece (repeat for several)")
     args = ap.parse_args()
+
+    given = [os.path.normpath(p) for p in args.png]
+    for s in args.silhouette:
+        if os.path.normpath(s) not in given:
+            sys.exit(f"--silhouette {s} is not one of the pngs given")
+    solid = {os.path.normpath(s) for s in args.silhouette}
 
     if args.name is not None:
         if len(args.png) != 1:
@@ -320,16 +415,17 @@ def main():
         if n in names[:i]:
             sys.exit(f"two sprites would both be named {n}; rename a file")
 
-    sprites = [read_sprite(p, n) for p, n in zip(args.png, names)]
+    sprites = [read_sprite(p, n, os.path.normpath(p) in solid) for p, n in zip(args.png, names)]
     text = emit(sprites, args.out)
     with open(args.out, "w", encoding="utf-8", newline="\n") as fp:
         fp.write(text)
 
     for sp in sprites:
         how = sp["kind"] or "centre"
+        note = f", {silhouette_note(sp)}" if sp["silhouette"] is not None else ""
         print(f"{sp['src']}: {sp['w']}x{sp['h']}, pivot ({sp['pivot'][0]}, {sp['pivot'][1]})"
               f" [{how}], {sp['painted']} painted ({sp['inked']} ink,"
-              f" {sp['painted'] - sp['inked']} black) -> {sp['name']}")
+              f" {sp['painted'] - sp['inked']} black){note} -> {sp['name']}")
     print(f"  wrote {args.out}")
 
 
