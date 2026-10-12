@@ -1,0 +1,55 @@
+#######################################
+# syntax coloring map for SecondDimension
+# columns are separated by a single real tab.
+#######################################
+
+#######################################
+# datatypes (KEYWORD1)
+#######################################
+
+SD_Sprite	KEYWORD1
+SD_Xform	KEYWORD1
+SD_Target	KEYWORD1
+SD_Canvas	KEYWORD1
+SD_Sample	KEYWORD1
+SD_Bone	KEYWORD1
+SD_Rig	KEYWORD1
+SD_GFXTarget	KEYWORD1
+
+#######################################
+# methods and functions (KEYWORD2)
+#######################################
+
+sd_draw	KEYWORD2
+sd_validateSprite	KEYWORD2
+sd_spritePixel	KEYWORD2
+sd_validateRig	KEYWORD2
+sd_ik2	KEYWORD2
+rigid	KEYWORD2
+compose	KEYWORD2
+inverse	KEYWORD2
+apply	KEYWORD2
+width	KEYWORD2
+height	KEYWORD2
+plot	KEYWORD2
+clear	KEYWORD2
+pixel	KEYWORD2
+stride	KEYWORD2
+buffer	KEYWORD2
+bytes	KEYWORD2
+pose	KEYWORD2
+draw	KEYWORD2
+world	KEYWORD2
+setColors	KEYWORD2
+
+#######################################
+# constants (LITERAL1)
+#######################################
+
+SD_SAMPLE_1	LITERAL1
+SD_SAMPLE_2x2	LITERAL1
+kSDSpriteFormat	LITERAL1
+SD_PROGMEM	LITERAL1
+SECONDDIMENSION_VERSION_MAJOR	LITERAL1
+SECONDDIMENSION_VERSION_MINOR	LITERAL1
+SECONDDIMENSION_VERSION_PATCH	LITERAL1
