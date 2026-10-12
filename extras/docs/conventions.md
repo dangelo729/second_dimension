@@ -1,6 +1,6 @@
 # Coordinate & rig conventions
 
-Eight rules, fixed. Everything in the library — the blit, the transform, the
+Nine rules, fixed. Everything in the library — the blit, the transform, the
 rig, the IK, the golden test suite — assumes exactly these. Each rule ends
 with what breaks if you assume otherwise, because that is how convention
 bugs present.
@@ -68,7 +68,9 @@ world[root]  = rigid(ox, oy, angle, flipX)
 world[child] = compose(world[parent], rigid(ox, oy, angle, flipX))
 ```
 
-and `world(i).apply(0, 0, …)` is where bone `i`'s pivot landed.
+and `world(i).apply(0, 0, …)` is where bone `i`'s pivot landed. With a
+bone's `scale` (R9) the local transform is `scaled(ox, oy, angle, flipX,
+scale)`, which at scale 1 is `rigid(ox, oy, angle, flipX)` bit for bit.
 
 *If you assume otherwise:* measuring `(ox, oy)` from the parent's top-left
 corner shifts every child by the parent's pivot, and a joint on the art's
@@ -179,3 +181,47 @@ outline inside the shape wherever another piece covers it, which is exactly
 the seam a group exists to remove; handing the group canvases smaller than
 the target clips the group to them; and listing a group's bones as visible
 draws them twice, once outlined each on its own.
+
+## R9 — A bone's scale applies first, about its pivot, and carries down the chain
+
+`SD_Bone::scale` (1 when a table leaves it out) is a uniform scale of the
+bone's pivot-relative sprite pixels. The local transform's order is fixed:
+scale, then mirror (R5), then turn, then move to `(ox, oy)`:
+
+```
+local = scaled(ox, oy, angle, flipX, scale)
+x' = ox + scale·(cos(angle)·fx − sin(angle)·dy)
+y' = oy + scale·(sin(angle)·fx + cos(angle)·dy)      fx = flipX ? −dx : dx
+```
+
+so the pivot still lands on `(ox, oy)` and one sprite pixel spans `scale`
+target pixels. Everything posed under a scaled bone is posed in its scaled
+frame, as `compose` gives it:
+
+- a child's `(ox, oy)` scales with its parent (pinned at `(15, 0)` under a
+  parent of scale 0.5, it lands 7.5 px out on the panel);
+- a child's sprite is drawn at its parent's scale times its own;
+- a target handed to `sd_ik2` through `world(joint).inverse()` (R6) comes
+  back in the joint's own units, so the chain's link lengths stay in sprite
+  pixels and the posed tip lands on the panel target.
+
+A scale of 0 or below (or nan) is taken as 0: a zero linear part, the
+pivot still on `(ox, oy)`; that bone and every bone under it are posed onto
+its pivot and `sd_draw` refuses them, so none is drawn. A uniform scale
+commutes with the mirror and the turn, so in exact arithmetic the order
+changes nothing; it is fixed because the golden pins pin the float
+expressions (each of rigid's four entries times the scale).
+
+The blit samples a scaled sprite, it does not redraw it (R2): under
+`SD_SAMPLE_1` a shrunk sprite loses every row and column that falls
+between two target pixel centres and a grown one doubles some, so a 1 px
+line breaks when shrunk; under `SD_SAMPLE_2x2` lines stay whole down to
+0.5 and are drawn bolder at any scale but 1. A group (R8) derives its
+outline after the scale, so its outline stays 1 px and closed.
+
+*If you assume otherwise:* scaling a child's `(ox, oy)` by hand as well as
+the parent's scale shrinks it twice; scaling a bone to make its sprite
+smaller shrinks everything hung from it, so a part meant to keep its size
+under a scaled parent needs the reciprocal scale on its own bone; and
+expecting 1 px art to survive a shrink under nearest-neighbour sampling
+loses lines.

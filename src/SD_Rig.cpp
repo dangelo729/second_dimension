@@ -26,7 +26,7 @@ bool SD_Rig::pose() {
       for (int k = i; k < count_; ++k) world_[k] = kZero;
       return false;
     }
-    const SD_Xform local = SD_Xform::rigid(b.ox, b.oy, b.angle, b.flipX);
+    const SD_Xform local = SD_Xform::scaled(b.ox, b.oy, b.angle, b.flipX, b.scale);
     world_[i] = b.parent < 0 ? local : SD_Xform::compose(world_[b.parent], local);
   }
   return true;

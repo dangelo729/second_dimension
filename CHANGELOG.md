@@ -10,6 +10,57 @@ explaining why the pins moved, and any change to the `SD_Sprite` layout is a new
 format number plus a MAJOR bump. During 0.x, MINOR releases may break API; breaks are
 called out under a "Breaking" heading.
 
+## [0.3.0] - unreleased
+
+### Added
+
+- **A bone's scale** (`SD_Rig.h`). `SD_Bone` gains `float scale` as its last member,
+  with a default member initializer of 1, so every seven-field initializer table
+  compiles unchanged and means scale 1. A bone's local transform scales its
+  pivot-relative sprite pixels by `scale` first, then mirrors, turns and moves them as
+  before, so a child's `(ox, oy)` and everything below it scale with its parent
+  through `compose` (under a parent of scale 0.5 a child pinned at `(15, 0)` lands
+  7.5 px out and is drawn at half its size) and `world(i).apply(0, 0)` is still where
+  the pivot lands. A scale of 0 or below (or nan) is taken as 0: a zero linear part at
+  the pivot, which `sd_draw` refuses, so that bone and every bone under it are never
+  drawn, and a group leaves such a piece out and returns false.
+- **`SD_Xform::scaled(x, y, angle, flipX, scale)`** (`SD_Xform.h`), the bone's local
+  transform: `rigid`'s matrix with each of `a`, `b`, `c`, `d` multiplied by the scale.
+  At scale 1 the product with 1.0f is exact, so `scaled(x, y, angle, flipX, 1)` is
+  `rigid(x, y, angle, flipX)` bit for bit, and `pose()` (which now calls `scaled` for
+  every bone) poses a scale-1 rig exactly as before. `rigid`'s signature and float
+  expressions are unchanged.
+- **The scale's tests.** `test_xform.cpp`: `scaled` at scale 1 against `rigid` bit for
+  bit, its matrix against `rigid`'s times the scale, its mapping, the zero linear part
+  for a scale of 0, -0, below 0 and nan. `test_rig.cpp`: a scaled root's world matrix,
+  a child at `(15, 0)` under a scale-0.5 parent landing 7.5 px out, scale under a mirror
+  and under a turned parent, a scaled and mirrored chain against a pose worked by hand,
+  a bone of scale 0, -1 or nan never drawn nor its child, and golden frames of the
+  arm-arm-mallet chain with its root at 0.5, 1.25 and 0.75 mirrored and its mallet at
+  2, both samplings (8 new pins). `test_draw.cpp`: golden frames of the three fixtures
+  at scales 0.5, 0.75, 0.9, 1.1, 1.5 and 2, both samplings (36 new pins); their painted
+  and lit pixels grow with the scale; a 1 px line shrunk to 0.75 breaks under
+  `SD_SAMPLE_1` and stays whole under `SD_SAMPLE_2x2`, and a 1 px bar grown to 2 is
+  2 px wide under `SD_SAMPLE_1` and 3 under `SD_SAMPLE_2x2` (the trade: 2x2 is bolder
+  when grown). `test_group.cpp`: the arm group through a root of scale 0.9 and 1.1 at
+  its six poses is one shape with one 1 px outline, both samplings (24 new pins), and a
+  piece of scale 0 is left out of its group. **No existing pin moved**: every golden of
+  0.2.0 holds bit for bit (the scale-1 rig goldens run through `scaled` now).
+- **Docs.** README: bones have a scale, what a scale does to 1 px ink under each
+  sampling, a group's outline after the scale; `extras/docs/conventions.md` R9: the
+  local transform's order, scale, mirror, turn, move; `keywords.txt` gains `scaled`.
+
+### Breaking
+
+- **`SD_Bone` needs C++14 or later.** A default member initializer makes an aggregate
+  only from C++14 on, so a C++11 build can no longer brace-initialize a bone table.
+  Teensy 4.x builds as gnu++17. `SD_Bone` is 4 B larger (28 B on 32-bit targets).
+
+### Fixed
+
+- **The version macros** in `SD_Config.h` said 0.1.0 through 0.2.0; they now match the
+  manifests, 0.3.0.
+
 ## [0.2.0] - unreleased
 
 ### Added

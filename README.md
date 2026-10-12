@@ -6,9 +6,10 @@
 any angle about its pivot and posed as bones, on small OLED and TFT displays, in the
 spirit of Adafruit GFX and the shape of its sibling ThirdDimension.
 
-> **Status: pre-release (v0.2.0).** The sprite format, the transform, the target seam
-> with its 1-bit canvas, the blit, the PNG converter, the rig of bones, the two-bone IK,
-> groups drawn as one shape with a derived outline, and the Adafruit_GFX adapter exist;
+> **Status: pre-release (v0.3.0).** The sprite format, the transform, the target seam
+> with its 1-bit canvas, the blit, the PNG converter, the rig of bones with a scale on
+> each, the two-bone IK, groups drawn as one shape with a derived outline, and the
+> Adafruit_GFX adapter exist;
 > the host suite passes with bit-exact golden pins, and the example sketch compiles for
 > Teensy 4.1. Nothing has run on a board yet: no frame has been seen on a panel and no
 > time has been measured.
@@ -25,9 +26,9 @@ spirit of Adafruit GFX and the shape of its sibling ThirdDimension.
   default (`SD_SAMPLE_2x2`), so a 1 px outline stays whole when it turns, or at one
   (`SD_SAMPLE_1`, nearest neighbour).
 - A rig of bones, `SD_Rig` over a caller-owned `SD_Bone[]`: each bone a sprite (or a
-  pure joint) pinned in its parent's sprite and turned about its own pivot, posed
-  parents first and drawn in array order, later over earlier. Mirror one bone and the
-  chain under it mirrors.
+  pure joint) pinned in its parent's sprite and scaled and turned about its own pivot,
+  posed parents first and drawn in array order, later over earlier. Mirror one bone and
+  the chain under it mirrors; scale one and the chain under it scales.
 - A closed-form two-bone IK, `sd_ik2`, that aims an arm's two angles at a point, either
   elbow, and says whether it reached.
 - Groups, `sd_drawGroup`: several bones drawn as one shape, its one 1 px outline derived
@@ -48,9 +49,9 @@ spirit of Adafruit GFX and the shape of its sibling ThirdDimension.
 **It is not:**
 
 - A display driver: the library never touches hardware; you push the pixels yourself.
-- Colour, scaled, or animated (yet): no colour targets, sprite sheets, frames, clips or
-  tweens. The blit takes any affine, so scale and shear are a matter of the matrix when
-  they come.
+- Colour or animated (yet): no colour targets, sprite sheets, frames, clips or tweens.
+  A bone has a uniform scale; the blit takes any affine, so a stretch or a shear is a
+  matter of the matrix when it comes.
 - A scene graph: no layers and no depth. Draw order is array order within a rig and
   call order between draws.
 - For AVR. A 32-bit MCU with hardware float is the floor (Teensy 4.x, ESP32, STM32F4+,
@@ -115,8 +116,8 @@ Include exactly one umbrella header per sketch:
 PNG (Aseprite export, one pivot pixel)
   └─ tools/png2sprite.py   ink + mask + pivot → header (planes in flash)
        └─ SD_Sprite        a non-owning view over two const planes, frozen format 1
-            └─ SD_Bone[]   parent · (ox, oy) in the parent's sprite · angle · flipX
-                 └─ SD_Rig     pose(): world[i] = compose(world[parent], rigid(...))
+            └─ SD_Bone[]   parent · (ox, oy) in the parent's sprite · angle · flipX · scale
+                 └─ SD_Rig     pose(): world[i] = compose(world[parent], scaled(...))
                       └─ sd_draw    turned box → inverse map → 2x2 OR sampling
                            └─ SD_Target   plot(x, y, on)  ← the seam
 ```
@@ -145,6 +146,26 @@ PNG (Aseprite export, one pivot pixel)
 - **Mirroring carries down.** `flipX` mirrors a bone about its pivot before its own
   turn, and everything under it: a child's `ox` flips with its parent and its angle
   turns the other way on the panel. One `flipX` mirrors a chain.
+- **A bone has a scale.** `SD_Bone`'s last member, `scale`, is a uniform scale of the
+  bone's sprite pixels about its pivot, applied before its mirror and its turn
+  (`SD_Xform::scaled(x, y, angle, flipX, scale)`, which at scale 1 is `rigid` bit for
+  bit). It defaults to 1, so a table of seven-field bones means scale 1 throughout (the
+  default member makes `SD_Bone` need C++14 or later). It carries down: a child's
+  `(ox, oy)` is in its parent's sprite pixels, so under a parent of scale 0.5 a child
+  pinned 15 px out lands 7.5 px out and is drawn at half its size, and a child's own
+  scale multiplies its parent's. A scale of 0 or below is a zero linear part at the
+  pivot: that bone and everything under it are posed onto the pivot and never drawn.
+- **What a scale does to 1 px ink.** The blit carries each target pixel back into the
+  sprite, so a scale is sampled, not redrawn. Under `SD_SAMPLE_1`, shrinking skips
+  every sprite row and column that falls between two target pixel centres (one in four
+  at 0.75), so a 1 px line breaks where a skipped row or column crossed it, and growing
+  doubles some rows and columns (a 1 px line grown to 2 is 2 px wide). Under
+  `SD_SAMPLE_2x2` the four samples, half a target pixel apart, catch every sprite row
+  and column down to a scale of 0.5, so lines stay whole; the trade is weight: at any
+  scale but 1 the samples straddle the art's pixels and every line is drawn a little
+  bolder (a 1 px line grown to 2 is 3 px wide). A group's outline is derived after the
+  scale, from the union of the scaled shapes, so it is 1 px wide and closed at any
+  scale.
 - **Parents first, drawn in order.** A bone's parent is −1 or an earlier index;
   `sd_validateRig` and `pose()` refuse anything else. `draw()` blits in array order, so
   later bones paint over earlier ones. A bone with no sprite is a pure joint: posed,
@@ -224,8 +245,8 @@ rather than misread. The full contract is in
   ESP32, STM32 and RP2350, which keep const data in flash natively. Either way the
   planes cost flash, not RAM, and the blit reads them through plain pointers. The view
   itself is plain `static const` (in RAM on Teensy 4.x).
-- A rig is caller-owned: its bones (24 B each on 32-bit targets) and its posed
-  transforms (24 B each), plus 12 B for the `SD_Rig`. Twenty bones are under 1 KB.
+- A rig is caller-owned: its bones (28 B each on 32-bit targets) and its posed
+  transforms (24 B each), plus 12 B for the `SD_Rig`. Twenty bones are about 1 KB.
 - A canvas is `(w + 7) / 8 x h` bytes, caller-owned: 1 KB at 128x64.
 - `sd_draw` costs the turned box's pixels times the samples: a 20x20 sprite at any
   angle is about 900 pixels, 3600 samples; `pose()` is one matrix compose per bone.
@@ -243,13 +264,19 @@ make -C test/host run
 ```
 
 It pins bit-exact FNV-1a frame hashes of three fixture sprites at 0, 20, 45, 70, 90
-and 180 degrees and mirrored, in both samplings, of an arm-arm-mallet rig at five
-poses, and of a group (two segments and a round elbow disc drawn as one shape) at six;
-checks that a group's silhouette and ink are `sd_draw`'s own pixels, that overlapping
-pieces give one contour with no line inside, and that nothing outside the shape is
-touched; reproduces the scratch mockup the 2x2 default came from; fuzzes clipping against
-a brute-force pass over exactly-sized heap planes; checks the rig against a pose worked
-by hand, its refusals, its draw order, its pure joints and its mirroring; checks
+and 180 degrees and mirrored, and at scales 0.5, 0.75, 0.9, 1.1, 1.5 and 2, in both
+samplings, of an arm-arm-mallet rig at five poses and scaled four ways, and of a group
+(two segments and a round elbow disc drawn as one shape) at six poses, and at each
+through a root of scale 0.9 and 1.1; checks that a group's silhouette and ink are
+`sd_draw`'s own pixels, that overlapping pieces give one contour with no line inside,
+that a scaled group is one shape with one 1 px outline, and that nothing outside the
+shape is touched; checks that a scaled sprite's pixels grow with the scale, that a 1 px
+line shrunk to 0.75 breaks under `SD_SAMPLE_1` and stays whole under `SD_SAMPLE_2x2`,
+and that `scaled` at scale 1 is `rigid` bit for bit; reproduces the scratch mockup the
+2x2 default came from; fuzzes clipping against a brute-force pass over exactly-sized
+heap planes; checks the rig against a pose worked by hand, its refusals, its draw
+order, its pure joints, its mirroring and its scales (a bone of scale 0 never drawn);
+checks
 `sd_ik2` by forward kinematics over a grid of targets, both elbows, out of reach and too
 close; and runs the converter on fixture PNGs against a pinned header. The pins require
 `-ffp-contract=off` (FMA contraction moves last-ulp results). Pins at angles other than

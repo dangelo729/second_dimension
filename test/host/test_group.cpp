@@ -6,8 +6,10 @@
 // shows; a shape touching the canvas's edge is outlined at the edge; a
 // pinhole is filled and a wider hole outlined; nothing outside the shape is
 // touched, on a dark, a lit and a checker background; the stamp never plots outside the target; the
-// refusals; and golden frames of a two-segment arm with a round elbow disc
-// at pinned poses.
+// refusals; golden frames of a two-segment arm with a round elbow disc at
+// pinned poses; and that arm through a root of scale 0.9 and 1.1, one shape
+// with one 1 px outline at every pose (the outline is derived after the
+// scale), pinned, and a piece of scale 0 left out of its group.
 
 #include <math.h>
 #include <string.h>
@@ -160,12 +162,38 @@ const uint64_t GOLDEN_GROUP[kArmPoseCount][2] = {
     {0xc4b33be579d95530ULL, 0x74fe463e21b8320fULL},  // 20, 45 mirrored
 };
 
-uint64_t armHash(int p, SD_Sample q, const char *label) {
+// pinned: the arm group at each pose with its root at scale 0.9 and 1.1,
+// 1x and 2x2, on the same canvases. regenerate only deliberately.
+const int kArmScaleCount = 2;
+const float kArmScale[kArmScaleCount] = {0.9f, 1.1f};
+const uint64_t GOLDEN_GROUP_SCALED[kArmScaleCount][kArmPoseCount][2] = {
+    {
+        // 0.9
+        {0xcd69da9198e7e012ULL, 0xcd69da9198e7e012ULL},  // 0, 0: 1x, 2x2
+        {0x9ea6ee3625c4abe6ULL, 0xc4f15e3c66bd791cULL},  // 20, 45
+        {0xd8a3d4628c05a024ULL, 0xde836144be487f33ULL},  // 45, -60
+        {0x03169a088b632962ULL, 0x4c675874ba2c20b5ULL},  // -30, 90
+        {0x3abe6e5bc13ea873ULL, 0x33a94f764ae575eaULL},  // 70, 120
+        {0x654e74e18d9fce6aULL, 0x0d0fbd40d8e16340ULL},  // 20, 45 mirrored
+    },
+    {
+        // 1.1
+        {0x74e00769af459132ULL, 0x55ad42290b40daf7ULL},  // 0, 0: 1x, 2x2
+        {0xe9b7502850c69884ULL, 0x1f974efcc749109bULL},  // 20, 45
+        {0xe4123714f3afcc46ULL, 0xdca8a5b30c9854f6ULL},  // 45, -60
+        {0xdaf9afff964971e8ULL, 0x5b600eb97be6b029ULL},  // -30, 90
+        {0x50e922fa934ae2c2ULL, 0x20def039a40e4a3cULL},  // 70, 120
+        {0xd2b4f6899c9acfbeULL, 0xeb3dfb0163f1fc8bULL},  // 20, 45 mirrored
+    },
+};
+
+uint64_t armHash(int p, SD_Sample q, const char *label, float scale = 1.0f) {
   OwnedCanvas dark(kArmW, kArmH), lit(kArmW, kArmH), sil(kArmW, kArmH), ink(kArmW, kArmH);
   dark.canvas.clear(false);
   lit.canvas.clear(true);
   SD_Bone b[3];
   armBones(b, kArmPoseDeg[p][0], kArmPoseDeg[p][1], kArmPoseFlip[p]);
+  if (scale != 1.0f) b[0].scale = scale;
   SD_Xform world[3];
   SD_Rig rig(b, world, 3);
   rig.pose();
@@ -440,4 +468,123 @@ void runGroupTests() {
       CHECK(h == GOLDEN_GROUP[p][qi], "%s: hash 0x%016llxULL != pinned 0x%016llxULL", label,
             (unsigned long long)h, (unsigned long long)GOLDEN_GROUP[p][qi]);
     }
+
+  // ---- scale: the arm through a root of scale 0.9 and 1.1 is one shape with
+  // one 1 px outline at every pose: drawn on dark, a pixel is lit exactly
+  // where it is the shape's edge (its silhouettes, drawn apart, and their
+  // pinholes) or ink inside it, the shape is one 4-connected piece and its
+  // edge one 8-connected piece ----
+  {
+    long wrong = 0, outside = 0;
+    int shapes = 0, contours = 0, frames = 0;
+    for (int k = 0; k < kArmScaleCount; ++k)
+      for (int p = 0; p < kArmPoseCount; ++p)
+        for (int qi = 0; qi < 2; ++qi) {
+          const SD_Sample q = qi == 0 ? SD_SAMPLE_1 : SD_SAMPLE_2x2;
+          OwnedCanvas got(kArmW, kArmH), sil(kArmW, kArmH), ink(kArmW, kArmH), shape(kArmW, kArmH),
+              inks(kArmW, kArmH), edge(kArmW, kArmH);
+          got.canvas.clear(false);
+          shape.canvas.clear(false);
+          inks.canvas.clear(false);
+          edge.canvas.clear(false);
+          SD_Bone b[3];
+          armBones(b, kArmPoseDeg[p][0], kArmPoseDeg[p][1], kArmPoseFlip[p]);
+          b[0].scale = kArmScale[k];
+          SD_Xform world[3];
+          SD_Rig rig(b, world, 3);
+          rig.pose();
+          for (int i = 0; i < 3; ++i) {
+            sd_drawSilhouette(shape.canvas, *b[i].sprite, rig.world(i), q);
+            sd_drawInk(inks.canvas, *b[i].sprite, rig.world(i), q);
+          }
+          const int list[3] = {0, 1, 2};
+          Record r(got.canvas);
+          sd_drawGroup(r, rig, b, list, 3, sil.canvas, ink.canvas, q);
+          for (int y = 0; y < kArmH; ++y)
+            for (int x = 0; x < kArmW; ++x) {
+              const bool in = inShape(shape.canvas, x, y);
+              const SD_Canvas &c = shape.canvas;
+              const bool rim = in && (!inShape(c, x - 1, y) || !inShape(c, x + 1, y) ||
+                                      !inShape(c, x, y - 1) || !inShape(c, x, y + 1));
+              if (rim) edge.canvas.plot((int16_t)x, (int16_t)y, true);
+              const bool want = rim || (in && inks.canvas.pixel((int16_t)x, (int16_t)y));
+              if (got.canvas.pixel((int16_t)x, (int16_t)y) != want) ++wrong;
+              if (!in && r.at(x, y) != 0) ++outside;
+            }
+          // the shape's 4-connected pieces, its set pixels and pinholes
+          OwnedCanvas full(kArmW, kArmH);
+          full.canvas.clear(false);
+          for (int y = 0; y < kArmH; ++y)
+            for (int x = 0; x < kArmW; ++x)
+              if (inShape(shape.canvas, x, y)) full.canvas.plot((int16_t)x, (int16_t)y, true);
+          int pieces4 = 0;
+          {
+            std::vector<uint8_t> seen((size_t)kArmW * kArmH, 0);
+            for (int i = 0; i < kArmW * kArmH; ++i) {
+              const int16_t ix = (int16_t)(i % kArmW), iy = (int16_t)(i / kArmW);
+              if (seen[(size_t)i] || !full.canvas.pixel(ix, iy)) continue;
+              ++pieces4;
+              std::vector<int> st(1, i);
+              seen[(size_t)i] = 1;
+              while (!st.empty()) {
+                const int at = st.back();
+                st.pop_back();
+                const int nx[4] = {at % kArmW - 1, at % kArmW + 1, at % kArmW, at % kArmW};
+                const int ny[4] = {at / kArmW, at / kArmW, at / kArmW - 1, at / kArmW + 1};
+                for (int d = 0; d < 4; ++d) {
+                  if (nx[d] < 0 || ny[d] < 0 || nx[d] >= kArmW || ny[d] >= kArmH) continue;
+                  const int qq = ny[d] * kArmW + nx[d];
+                  if (seen[(size_t)qq] || !full.canvas.pixel((int16_t)nx[d], (int16_t)ny[d]))
+                    continue;
+                  seen[(size_t)qq] = 1;
+                  st.push_back(qq);
+                }
+              }
+            }
+          }
+          shapes += pieces4 == 1 ? 1 : 0;
+          contours += litPieces(edge.canvas, 0, 0, kArmW, kArmH) == 1 ? 1 : 0;
+          ++frames;
+        }
+    CHECK(wrong == 0 && outside == 0,
+          "scaled arm: %ld pixels off the shape's one 1 px outline and its ink, %ld touched "
+          "outside it",
+          wrong, outside);
+    CHECK(shapes == frames && contours == frames,
+          "scaled arm: one shape in %d of %d frames, one outline in %d", shapes, frames, contours);
+  }
+
+  // ---- golden: the arm group through a scaled root ----
+  for (int k = 0; k < kArmScaleCount; ++k)
+    for (int p = 0; p < kArmPoseCount; ++p)
+      for (int qi = 0; qi < 2; ++qi) {
+        const SD_Sample q = qi == 0 ? SD_SAMPLE_1 : SD_SAMPLE_2x2;
+        char label[96];
+        std::snprintf(label, sizeof(label), "group_scaled_%g_%d_%d%s_%s", kArmScale[k],
+                      kArmPoseDeg[p][0], kArmPoseDeg[p][1], kArmPoseFlip[p] ? "_mirrored" : "",
+                      qi == 0 ? "1x" : "2x2");
+        const uint64_t h = armHash(p, q, label, kArmScale[k]);
+        CHECK(h == GOLDEN_GROUP_SCALED[k][p][qi], "%s: hash 0x%016llxULL != pinned 0x%016llxULL",
+              label, (unsigned long long)h, (unsigned long long)GOLDEN_GROUP_SCALED[k][p][qi]);
+      }
+
+  // ---- a piece of scale 0 is left out of its group: the rest drawn, false returned ----
+  {
+    OwnedCanvas got(kArmW, kArmH), want(kArmW, kArmH), sil(kArmW, kArmH), ink(kArmW, kArmH);
+    got.canvas.clear(false);
+    want.canvas.clear(false);
+    SD_Bone b[3];
+    armBones(b, 20, 45, false);
+    SD_Xform world[3];
+    SD_Rig rig(b, world, 3);
+    rig.pose();
+    const int two[2] = {0, 1}, all[3] = {0, 1, 2};
+    CHECK(sd_drawGroup(want.canvas, rig, b, two, 2, sil.canvas, ink.canvas),
+          "the arm's first two pieces: group refused");
+    b[2].scale = 0.0f;
+    rig.pose();
+    CHECK(!sd_drawGroup(got.canvas, rig, b, all, 3, sil.canvas, ink.canvas) &&
+              memcmp(got.canvas.buffer(), want.canvas.buffer(), got.canvas.bytes()) == 0,
+          "a group with a piece of scale 0: not false, or not its other pieces alone");
+  }
 }

@@ -61,7 +61,10 @@ void sd_stampOutline(SD_Target &target, const SD_Canvas &silhouette, const SD_Ca
 // negative count, or a listed bone the rig has not posed (an index outside
 // the rig reads the zero matrix there, and is refused before the table is
 // read); otherwise the group is drawn, and it returns false if any bone's
-// sd_draw would (a sprite that fails sd_validateSprite).
+// sd_draw would (a sprite that fails sd_validateSprite, or a bone of scale
+// 0 or below, whose matrix has no finite inverse): that piece is left out.
+// a group drawn through scaled bones derives its outline after the scale,
+// from the scaled shapes' union, so it is 1 px and closed at any scale.
 bool sd_drawGroup(SD_Target &target, const SD_Rig &rig, const SD_Bone *table, const int *bones,
                   int n, SD_Canvas &silhouette, SD_Canvas &ink, SD_Sample sample = SD_SAMPLE_2x2);
 

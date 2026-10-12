@@ -5,7 +5,11 @@
 // mockup's frame; clipping (half off each edge, wholly off, a 1x1 target,
 // and a fuzz against a brute-force pass over the whole target, all through a
 // target that counts out-of-bounds plots, over exactly-sized heap planes);
-// and the refusals (a bad sprite, a matrix with no finite inverse).
+// the refusals (a bad sprite, a matrix with no finite inverse); and scale:
+// golden frames of every fixture shrunk and grown, both samplings, its
+// painted and lit pixels growing with the scale, and a 1 px line shrunk to
+// 0.75 that breaks under SD_SAMPLE_1 and stays whole under SD_SAMPLE_2x2,
+// which in turn draws a line grown to 2 a pixel bolder.
 
 #include <math.h>
 #include <string.h>
@@ -145,6 +149,130 @@ static const uint64_t GOLDEN_POSE[kFixtureCount][kPoseCount][2] = {
         {0xabfce2339ce28c4fULL, 0xb3dca6a2c371ac91ULL},  // 20 deg, mirrored
     },
 };
+
+// ---- scale goldens: each fixture at these scales, angle 0 ----
+static const int kScaleCount = 6;
+static const float kScales[kScaleCount] = {0.5f, 0.75f, 0.9f, 1.1f, 1.5f, 2.0f};
+
+// the scale golden canvas: 48x48, the sprite's pivot at (8, 28), so every
+// fixture is whole at 2x; drawn on a canvas cleared dark and on one cleared
+// lit, hashed as the pose goldens are.
+static const int16_t kScaleW = 48, kScaleH = 48;
+static const float kScaleX = 8.0f, kScaleY = 28.0f;
+
+// pinned scale golden hashes, in fixture, scale, sampling order, through
+// SD_Xform::scaled(8, 28, 0, false, scale). regenerate only deliberately: a
+// moved pin is a changelog entry and a version bump.
+static const uint64_t GOLDEN_SCALE[kFixtureCount][kScaleCount][2] = {
+    {
+        // arm
+        {0x118390f82defa9d3ULL, 0xd2924776b9a9b658ULL},  // 0.5: 1x, 2x2
+        {0x95a2d45ddc39f4b3ULL, 0x9be8ed8813c30793ULL},  // 0.75
+        {0x568cb7ff76167d33ULL, 0x4081f5eb831dfe24ULL},  // 0.9
+        {0xf1ed43554b174337ULL, 0x942a634af2a14e0bULL},  // 1.1
+        {0x40f2da12181877beULL, 0xcdde4301001e4a5fULL},  // 1.5
+        {0xc03ecb961492125bULL, 0xc8007fb2af369475ULL},  // 2
+    },
+    {
+        // mallet
+        {0x7c83b33d0c1cd833ULL, 0xd4ab0f5e6b59a667ULL},  // 0.5: 1x, 2x2
+        {0xaf36c4d7a60ead27ULL, 0x97b59e5cf192bba7ULL},  // 0.75
+        {0xef1aa95f6484f4bdULL, 0xef1aa95f6484f4bdULL},  // 0.9
+        {0x8e962c8556aec9b2ULL, 0xcec7eef272baea5dULL},  // 1.1
+        {0xf8c248f1b54f5536ULL, 0x5d52e4d88b400508ULL},  // 1.5
+        {0x1cae44a78384fd77ULL, 0xf00f8a8c9152fe70ULL},  // 2
+    },
+    {
+        // flag
+        {0x9f1ed69e3945d1e3ULL, 0x7cde8266510f588bULL},  // 0.5: 1x, 2x2
+        {0xb2a57a89eb5364d1ULL, 0x696fcce66b811ef5ULL},  // 0.75
+        {0xbf7ba1f3bdf1a9d6ULL, 0x1d33f8c2fd9d5bc5ULL},  // 0.9
+        {0x4dd5a44fd8fa40ecULL, 0x2c1f5eb4205991c7ULL},  // 1.1
+        {0x1f122bd9b3f673cbULL, 0x67428e8fec307edbULL},  // 1.5
+        {0xde4ab77d909acc77ULL, 0x45026662e0a298f0ULL},  // 2
+    },
+};
+
+// a 1 px line two pixels a step (about 27 degrees), 8-connected, pivot at its
+// first pixel; and a 1 px bar.
+static const ArtFixture kShallow("shallow",
+                                 {
+                                     "##..............",
+                                     "..##............",
+                                     "....##..........",
+                                     "......##........",
+                                     "........##......",
+                                     "..........##....",
+                                     "............##..",
+                                     "..............##",
+                                 },
+                                 0, 0);
+static const ArtFixture kBar("bar", {"################"}, 0, 0);
+
+// a target that remembers each pixel's last plot: 0 never, 1 dark, 2 lit.
+class Marks : public SD_Target {
+ public:
+  Marks(int16_t w, int16_t h) : w_(w), h_(h), at_((size_t)w * (size_t)h, 0) {}
+  int16_t width() const override { return w_; }
+  int16_t height() const override { return h_; }
+  void plot(int16_t x, int16_t y, bool on) override {
+    at_[(size_t)y * (size_t)w_ + (size_t)x] = on ? 2 : 1;
+  }
+  uint8_t at(int x, int y) const { return at_[(size_t)y * (size_t)w_ + (size_t)x]; }
+  long count(uint8_t least) const {
+    long n = 0;
+    for (uint8_t v : at_) n += v >= least ? 1 : 0;
+    return n;
+  }
+  // the 8-connected pieces of the lit pixels
+  int litPieces() const {
+    std::vector<uint8_t> seen(at_.size(), 0);
+    int n = 0;
+    for (int i = 0; i < (int)at_.size(); ++i) {
+      if (at_[(size_t)i] != 2 || seen[(size_t)i]) continue;
+      ++n;
+      std::vector<int> st(1, i);
+      seen[(size_t)i] = 1;
+      while (!st.empty()) {
+        const int p = st.back();
+        st.pop_back();
+        for (int dy = -1; dy <= 1; ++dy)
+          for (int dx = -1; dx <= 1; ++dx) {
+            const int x = p % w_ + dx, y = p / w_ + dy;
+            if (x < 0 || y < 0 || x >= w_ || y >= h_) continue;
+            const int q = y * w_ + x;
+            if (seen[(size_t)q] || at_[(size_t)q] != 2) continue;
+            seen[(size_t)q] = 1;
+            st.push_back(q);
+          }
+      }
+    }
+    return n;
+  }
+
+ private:
+  int16_t w_, h_;
+  std::vector<uint8_t> at_;
+};
+
+static uint64_t scaleHash(const SD_Sprite &s, float scale, SD_Sample q, const char *label) {
+  OwnedCanvas dark(kScaleW, kScaleH), lit(kScaleW, kScaleH);
+  dark.canvas.clear(false);
+  lit.canvas.clear(true);
+  const SD_Xform m = SD_Xform::scaled(kScaleX, kScaleY, 0.0f, false, scale);
+  TrapTarget td(dark.canvas), tl(lit.canvas);
+  const bool ok1 = sd_draw(td, s, m, q);
+  const bool ok2 = sd_draw(tl, s, m, q);
+  CHECK(ok1 && ok2 && td.oob == 0 && tl.oob == 0,
+        "%s: sd_draw returned false or plotted out of bounds", label);
+  char name[96];
+  std::snprintf(name, sizeof(name), "%s_dark", label);
+  writeFrame(dark.canvas, name);
+  std::snprintf(name, sizeof(name), "%s_lit", label);
+  writeFrame(lit.canvas, name);
+  return fnv1a(lit.canvas.buffer(), lit.canvas.bytes(),
+               fnv1a(dark.canvas.buffer(), dark.canvas.bytes()));
+}
 
 void runDrawTests() {
   // ---- canvas: drawBitmap's row layout, read-back, bounds ----
@@ -453,5 +581,74 @@ void runDrawTests() {
     const SD_Xform inf = {1, 0, 0, 1, INFINITY, 5};
     CHECK(!sd_draw(t, kArm.sprite, inf), "infinite translation drawn");
     CHECK(t.plots == 0, "refused draws plotted %ld pixels", t.plots);
+  }
+
+  // ---- scale: goldens of every fixture shrunk and grown ----
+  for (int f = 0; f < kFixtureCount; ++f) {
+    const ArtFixture &fx = *kFixtures[f];
+    for (int k = 0; k < kScaleCount; ++k)
+      for (int qi = 0; qi < 2; ++qi) {
+        const SD_Sample q = qi == 0 ? SD_SAMPLE_1 : SD_SAMPLE_2x2;
+        char label[64];
+        std::snprintf(label, sizeof(label), "scale_%s_%g_%s", fx.name, kScales[k], sampleName(q));
+        const uint64_t h = scaleHash(fx.sprite, kScales[k], q, label);
+        CHECK(h == GOLDEN_SCALE[f][k][qi], "%s: hash 0x%016llxULL != pinned 0x%016llxULL", label,
+              (unsigned long long)h, (unsigned long long)GOLDEN_SCALE[f][k][qi]);
+      }
+  }
+
+  // ---- scale: the painted and the lit pixels grow with the scale. under
+  // SD_SAMPLE_1 through 1 too; under SD_SAMPLE_2x2 across the six, for at
+  // scale 1 and an integer position its four samples fall in one sprite
+  // pixel (the art itself) and at any other scale they straddle, which
+  // draws every line bolder ----
+  for (int f = 0; f < kFixtureCount; ++f)
+    for (int qi = 0; qi < 2; ++qi) {
+      const SD_Sample q = qi == 0 ? SD_SAMPLE_1 : SD_SAMPLE_2x2;
+      const float order[7] = {0.5f, 0.75f, 0.9f, 1.0f, 1.1f, 1.5f, 2.0f};
+      long painted[7], lit[7];
+      for (int k = 0; k < 7; ++k) {
+        Marks mk(kScaleW, kScaleH);
+        sd_draw(mk, kFixtures[f]->sprite, SD_Xform::scaled(kScaleX, kScaleY, 0.0f, false, order[k]),
+                q);
+        painted[k] = mk.count(1);
+        lit[k] = mk.count(2);
+      }
+      bool grows = true;
+      for (int k = 1; k < 7; ++k) {
+        const int prev = (q == SD_SAMPLE_2x2 && k == 4) ? 2 : k - 1;
+        if (q == SD_SAMPLE_2x2 && k == 3) continue;
+        grows = grows && painted[k] > painted[prev] && lit[k] > lit[prev];
+      }
+      CHECK(grows,
+            "%s %s: painted %ld %ld %ld %ld %ld %ld %ld and lit %ld %ld %ld %ld %ld %ld %ld at "
+            "0.5 .. 2 do not grow with the scale",
+            kFixtures[f]->name, sampleName(q), painted[0], painted[1], painted[2], painted[3],
+            painted[4], painted[5], painted[6], lit[0], lit[1], lit[2], lit[3], lit[4], lit[5],
+            lit[6]);
+    }
+
+  // ---- scale: a 1 px line shrunk to 0.75 breaks under SD_SAMPLE_1 (a
+  // sprite column or row in four falls between target pixel centres) and
+  // stays whole under SD_SAMPLE_2x2 (its samples, 0.67 sprite px apart, catch
+  // every one); grown to 2, a 1 px bar is 2 px wide under SD_SAMPLE_1 and 3
+  // under SD_SAMPLE_2x2 ----
+  {
+    Marks one(32, 24), four(32, 24);
+    const SD_Xform m = SD_Xform::scaled(4.0f, 4.0f, 0.0f, false, 0.75f);
+    sd_draw(one, kShallow.sprite, m, SD_SAMPLE_1);
+    sd_draw(four, kShallow.sprite, m, SD_SAMPLE_2x2);
+    CHECK(one.litPieces() > 1 && four.litPieces() == 1,
+          "a 1 px line at 0.75: %d pieces under 1x (more than one), %d under 2x2 (one)",
+          one.litPieces(), four.litPieces());
+    int rows[2] = {0, 0};
+    for (int qi = 0; qi < 2; ++qi) {
+      Marks bar(48, 16);
+      sd_draw(bar, kBar.sprite, SD_Xform::scaled(4.0f, 8.0f, 0.0f, false, 2.0f),
+              qi == 0 ? SD_SAMPLE_1 : SD_SAMPLE_2x2);
+      for (int y = 0; y < 16; ++y) rows[qi] += bar.at(16, y) == 2 ? 1 : 0;
+    }
+    CHECK(rows[0] == 2 && rows[1] == 3,
+          "a 1 px bar at 2: %d px wide under 1x (2), %d under 2x2 (3)", rows[0], rows[1]);
   }
 }

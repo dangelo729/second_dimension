@@ -13,7 +13,7 @@
 #endif
 
 #define SECONDDIMENSION_VERSION_MAJOR 0
-#define SECONDDIMENSION_VERSION_MINOR 1
+#define SECONDDIMENSION_VERSION_MINOR 3
 #define SECONDDIMENSION_VERSION_PATCH 0
 
 // flash placement for generated sprite planes. teensy needs the progmem

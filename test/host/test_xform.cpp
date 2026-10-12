@@ -3,9 +3,13 @@
 // mirrors x only; rigid at 90 degrees maps the unit axes as the convention
 // says (x right, y down, positive angles clockwise on the panel: +x turns to
 // +y); compose applies the child first; compose then inverse is the
-// identity to float tolerance; a singular matrix inverts to zeros.
+// identity to float tolerance; a singular matrix inverts to zeros; scaled
+// at scale 1 is rigid bit for bit, scales the sprite pixels first, then
+// mirrors, turns and moves them, and takes a scale of 0 or below (or nan)
+// as a zero linear part.
 
 #include <math.h>
+#include <string.h>
 
 #include "SD_Xform.h"
 
@@ -147,6 +151,68 @@ void runXformTests() {
                 inv.tx == 0.0f && inv.ty == 0.0f,
             "matrix {%g %g %g %g %g %g} should invert to zeros", m.a, m.b, m.c, m.d, m.tx,
             m.ty);
+    }
+  }
+  // ---- scaled at scale 1 is rigid, bit for bit; any scale multiplies its matrix ----
+  {
+    long bad = 0, exact = 0;
+    for (int k = 0; k < 400; ++k) {
+      const float ang = -7.0f + 0.035f * (float)k;
+      const float x = -50.0f + 0.25f * (float)k, y = 30.0f - 0.375f * (float)k;
+      const bool flip = (k & 1) != 0;
+      const SD_Xform r = SD_Xform::rigid(x, y, ang, flip);
+      const SD_Xform one = SD_Xform::scaled(x, y, ang, flip, 1.0f);
+      if (memcmp(&r, &one, sizeof r) != 0) ++exact;
+      const float s = 0.05f + 0.01f * (float)k;
+      const SD_Xform m = SD_Xform::scaled(x, y, ang, flip, s);
+      if (m.a != r.a * s || m.b != r.b * s || m.c != r.c * s || m.d != r.d * s || m.tx != x ||
+          m.ty != y)
+        ++bad;
+    }
+    CHECK(exact == 0, "scaled(..., 1) differs from rigid in %ld of 400 cases", exact);
+    CHECK(bad == 0, "scaled is not rigid's matrix times the scale in %ld of 400 cases", bad);
+  }
+
+  // ---- scaled: the scale first, then the mirror, the turn and the move ----
+  {
+    const SD_Xform m = SD_Xform::scaled(5.0f, 7.0f, degToRad(90.0f), false, 2.0f);
+    float x, y;
+    m.apply(1.0f, 0.0f, &x, &y);
+    CHECK(near(x, 5.0f, 1e-6f) && near(y, 9.0f, 1e-6f), "scaled(90, 2): +x went to (%g, %g)", x,
+          y);
+    m.apply(0.0f, 1.0f, &x, &y);
+    CHECK(near(x, 3.0f, 1e-6f) && near(y, 7.0f, 1e-6f), "scaled(90, 2): +y went to (%g, %g)", x,
+          y);
+    m.apply(0.0f, 0.0f, &x, &y);
+    CHECK(x == 5.0f && y == 7.0f, "scaled: the pivot went to (%g, %g), not (5, 7)", x, y);
+    const SD_Xform f = SD_Xform::scaled(10.0f, 20.0f, 0.0f, true, 0.5f);
+    f.apply(4.0f, -2.0f, &x, &y);
+    CHECK(x == 8.0f && y == 19.0f, "scaled(0, mirrored, 0.5): (4, -2) went to (%g, %g)", x, y);
+    long bad = 0;
+    for (int k = 0; k < 200; ++k) {
+      const float ang = -6.0f + 0.06f * (float)k, s = 0.25f + 0.02f * (float)k;
+      const float dx = -9.0f + 0.09f * (float)k, dy = 4.0f - 0.07f * (float)k;
+      const bool flip = (k % 3) == 0;
+      SD_Xform::scaled(12.0f, -8.0f, ang, flip, s).apply(dx, dy, &x, &y);
+      const double fx = flip ? -dx : dx;
+      const double wx = 12.0 + (double)s * (cos(ang) * fx - sin(ang) * dy);
+      const double wy = -8.0 + (double)s * (sin(ang) * fx + cos(ang) * dy);
+      if (fabs(x - wx) > 1e-4 || fabs(y - wy) > 1e-4) ++bad;
+    }
+    CHECK(bad == 0, "scaled disagrees with x + s (cos dx - sin dy) at %ld of 200 points", bad);
+  }
+
+  // ---- scaled: a scale of 0 or below, or nan, is a zero linear part ----
+  {
+    const float zeros[] = {0.0f, -0.0f, -1.0f, -1e-30f, NAN};
+    for (float s : zeros) {
+      const SD_Xform m = SD_Xform::scaled(6.0f, -3.0f, 0.4f, s != s, s);
+      const SD_Xform inv = m.inverse();
+      CHECK(m.a == 0.0f && m.b == 0.0f && m.c == 0.0f && m.d == 0.0f && m.tx == 6.0f &&
+                m.ty == -3.0f && inv.a == 0.0f && inv.b == 0.0f && inv.c == 0.0f &&
+                inv.d == 0.0f && inv.tx == 0.0f && inv.ty == 0.0f,
+            "scale %g: not a zero linear part at the pivot (%g %g %g %g, %g %g), or inverted",
+            s, m.a, m.b, m.c, m.d, m.tx, m.ty);
     }
   }
 }

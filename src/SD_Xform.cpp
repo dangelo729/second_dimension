@@ -21,6 +21,16 @@ SD_Xform SD_Xform::rigid(float x, float y, float angle, bool flipX) {
   return m;
 }
 
+SD_Xform SD_Xform::scaled(float x, float y, float angle, bool flipX, float scale) {
+  const float s = scale > 0.0f ? scale : 0.0f;
+  SD_Xform m = rigid(x, y, angle, flipX);
+  m.a = m.a * s;
+  m.b = m.b * s;
+  m.c = m.c * s;
+  m.d = m.d * s;
+  return m;
+}
+
 SD_Xform SD_Xform::compose(const SD_Xform &p, const SD_Xform &q) {
   SD_Xform m;
   m.a = p.a * q.a + p.b * q.c;

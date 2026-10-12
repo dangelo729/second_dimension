@@ -28,6 +28,16 @@ struct SD_Xform {
   //     y' = y + sin(angle) dx + cos(angle) dy
   static SD_Xform rigid(float x, float y, float angle, bool flipX = false);
 
+  // rigid with the pivot-relative sprite pixels scaled by scale first: a
+  // uniform scale, then the mirror, the turn and the move, so the pivot
+  // still lands on (x, y) and a sprite pixel spans scale target pixels.
+  // each of a, b, c, d is rigid's times scale and tx, ty are rigid's, so
+  // scaled(x, y, angle, flipX, 1) is rigid(x, y, angle, flipX) bit for bit
+  // (a product with 1.0f is exact). a scale of 0 or below, or nan, is taken
+  // as 0: a zero linear part with the pivot still on (x, y), which sd_draw
+  // refuses.
+  static SD_Xform scaled(float x, float y, float angle, bool flipX, float scale);
+
   // child first, then parent: compose(p, q).apply(v) is p.apply(q.apply(v)).
   static SD_Xform compose(const SD_Xform &parent, const SD_Xform &child);
 

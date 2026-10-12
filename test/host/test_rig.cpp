@@ -8,8 +8,13 @@
 // drawn; a mirrored parent carries its child where the mirror says (the
 // child's ox flips, its angle turns the other way, a mirrored child under a
 // mirrored parent is unmirrored, and the frame at angle 0 is the unmirrored
-// frame reflected pixel for pixel); and golden frames of the stage 0 arm
-// and mallet fixtures as a chain at pinned angles.
+// frame reflected pixel for pixel); a bone's scale (a scaled root's world
+// matrix, a child pinned 15 px out under a parent of scale 0.5 landing 7.5
+// px out, scale under a mirror and under a turned parent, a scaled chain
+// against a pose worked by hand, a bone of scale 0 or below posed onto its
+// pivot and never drawn, nor anything under it); golden frames of the stage
+// 0 arm and mallet fixtures as a chain at pinned angles, every bone at scale
+// 1 by default; and golden frames of that chain scaled.
 
 #include <math.h>
 #include <string.h>
@@ -43,6 +48,15 @@ static void checker(SD_Canvas &c) {
     for (int16_t x = 0; x < c.width(); ++x) c.plot(x, y, ((x + y) & 1) != 0);
 }
 
+// a target that only counts its plots.
+class TrapCount : public SD_Target {
+ public:
+  int16_t width() const override { return 64; }
+  int16_t height() const override { return 48; }
+  void plot(int16_t, int16_t, bool) override { ++plots; }
+  long plots = 0;
+};
+
 // 6x6 blocks, pivot at the top-left pixel: one all white, one all black.
 static const uint8_t kBlockFull[6] = {0xfc, 0xfc, 0xfc, 0xfc, 0xfc, 0xfc};
 static const uint8_t kBlockNone[6] = {0, 0, 0, 0, 0, 0};
@@ -72,12 +86,35 @@ static const uint64_t GOLDEN_RIG[kRigPoseCount][2] = {
     {0xcabb0631bece038fULL, 0x9989169591467b5bULL},  // 20, 45, -70, mirrored
 };
 
-static uint64_t rigHash(const int deg[3], bool flip, SD_Sample q, const char *label) {
-  const SD_Bone bones[3] = {
+// the chain scaled, at the 20, 45, -70 pose: the root at 0.5 and at 1.25,
+// the mallet alone at 2, and the root at 0.75 mirrored; the same canvas.
+static const int kRigScaleCount = 4;
+static const float kRigScale[kRigScaleCount][3] = {
+    {0.5f, 1.0f, 1.0f}, {1.25f, 1.0f, 1.0f}, {1.0f, 1.0f, 2.0f}, {0.75f, 1.0f, 1.0f}};
+static const bool kRigScaleFlip[kRigScaleCount] = {false, false, false, true};
+
+// pinned scaled rig golden hashes, in scale, sampling (1x, 2x2) order.
+// regenerate only deliberately: a moved pin is a changelog entry and a
+// version bump.
+static const uint64_t GOLDEN_RIG_SCALED[kRigScaleCount][2] = {
+    {0x394c065a3b44b768ULL, 0x6f48488264ab2858ULL},  // root 0.5
+    {0x6cf865cac292bb74ULL, 0x5041dcc34a7af8bbULL},  // root 1.25
+    {0x22372b4105b36842ULL, 0xbce30e60a5922aacULL},  // mallet 2
+    {0xb2173bf1a88f45caULL, 0xdf57bd1787a324d8ULL},  // root 0.75, mirrored
+};
+
+// the chain's three scales: the root's, the second arm's and the mallet's
+static const float kScaleOne[3] = {1.0f, 1.0f, 1.0f};
+
+static uint64_t rigHash(const int deg[3], bool flip, SD_Sample q, const char *label,
+                        const float (&scale)[3] = kScaleOne) {
+  SD_Bone bones[3] = {
       {-1, 48.0f, 48.0f, degToRad((float)deg[0]), flip, true, &kArm.sprite},
       {0, 15.0f, 0.0f, degToRad((float)deg[1]), false, true, &kArm.sprite},
       {1, 15.0f, 0.0f, degToRad((float)deg[2]), false, true, &kMallet.sprite},
   };
+  for (int i = 0; i < 3; ++i)
+    if (scale[i] != 1.0f) bones[i].scale = scale[i];
   SD_Xform world[3];
   SD_Rig rig(bones, world, 3);
   CHECK(rig.pose(), "%s: pose() refused a valid chain", label);
@@ -327,6 +364,146 @@ void runRigTests() {
     }
   }
 
+  // ---- scale: a scaled root's world matrix ----
+  {
+    const SD_Bone bones[1] = {{-1, 20.0f, 15.0f, 0.3f, false, true, &kArm.sprite, 0.5f}};
+    SD_Xform world[1];
+    SD_Rig rig(bones, world, 1);
+    CHECK(rig.pose(), "a scaled root: pose() refused");
+    const SD_Xform want = SD_Xform::scaled(20.0f, 15.0f, 0.3f, false, 0.5f);
+    CHECK(memcmp(&rig.world(0), &want, sizeof want) == 0,
+          "a scaled root's world is not scaled(20, 15, 0.3, false, 0.5)");
+    const SD_Xform &w = rig.world(0);
+    CHECK(near(w.a, 0.5 * cos(0.3), 1e-6) && near(w.b, -0.5 * sin(0.3), 1e-6) &&
+              near(w.c, 0.5 * sin(0.3), 1e-6) && near(w.d, 0.5 * cos(0.3), 1e-6),
+          "a scaled root's matrix {%g %g %g %g} is not half its turn", w.a, w.b, w.c, w.d);
+    float x, y;
+    rig.world(0).apply(0.0f, 0.0f, &x, &y);
+    CHECK(x == 20.0f && y == 15.0f, "a scaled root's pivot landed on (%g, %g), not (20, 15)", x, y);
+  }
+
+  // ---- scale: a child pinned at (15, 0) under a parent of scale 0.5 lands 7.5 px out ----
+  {
+    const SD_Bone bones[2] = {
+        {-1, 20.0f, 20.0f, 0.0f, false, true, &kArm.sprite, 0.5f},
+        {0, 15.0f, 0.0f, 0.0f, false, true, &kMallet.sprite},
+    };
+    SD_Xform world[2];
+    SD_Rig rig(bones, world, 2);
+    rig.pose();
+    float x, y;
+    rig.world(1).apply(0.0f, 0.0f, &x, &y);
+    CHECK(x == 27.5f && y == 20.0f,
+          "under a parent of scale 0.5, (15, 0) landed on (%g, %g), not (27.5, 20)", x, y);
+    const SD_Xform want = SD_Xform::scaled(27.5f, 20.0f, 0.0f, false, 0.5f);
+    CHECK(memcmp(&rig.world(1), &want, sizeof want) == 0,
+          "the child of a parent of scale 0.5 is not drawn at half its size");
+  }
+
+  // ---- scale under a mirror, and under a turned parent ----
+  {
+    const SD_Bone mir[2] = {
+        {-1, 20.0f, 20.0f, 0.0f, true, true, &kArm.sprite, 0.5f},
+        {0, 6.0f, 2.0f, 0.4f, false, true, &kMallet.sprite},
+    };
+    SD_Xform world[2];
+    SD_Rig rig(mir, world, 2);
+    rig.pose();
+    float x, y;
+    rig.world(1).apply(0.0f, 0.0f, &x, &y);
+    CHECK(x == 17.0f && y == 21.0f,
+          "mirrored parent of scale 0.5: the child's pivot at (%g, %g), want (17, 21)", x, y);
+    CHECK(nearXform(rig.world(1), SD_Xform::scaled(17.0f, 21.0f, -0.4f, true, 0.5f), 1e-6, 1e-6),
+          "mirrored parent of scale 0.5: the child should be scaled(17, 21, -0.4, mirrored, 0.5)");
+    const SD_Bone turned[2] = {
+        {-1, 20.0f, 20.0f, 0.7f, false, true, &kArm.sprite, 2.0f},
+        {0, 6.0f, 2.0f, 0.4f, false, true, &kMallet.sprite},
+    };
+    SD_Rig rig2(turned, world, 2);
+    rig2.pose();
+    const double wx = 20.0 + 2.0 * (cos(0.7) * 6.0 - sin(0.7) * 2.0);
+    const double wy = 20.0 + 2.0 * (sin(0.7) * 6.0 + cos(0.7) * 2.0);
+    CHECK(nearXform(rig2.world(1), SD_Xform::scaled((float)wx, (float)wy, 0.7f + 0.4f, false, 2.0f),
+                    1e-6, 1e-5),
+          "turned parent of scale 2: the child is not scaled((%g, %g), 1.1, 2)", wx, wy);
+  }
+
+  // ---- a scaled chain matches the pose worked by hand: scales multiply down it ----
+  {
+    const SD_Bone bones[4] = {
+        {-1, 30.0f, 25.0f, 0.3f, false, true, &kArm.sprite, 0.5f},
+        {0, 10.0f, 2.0f, -0.5f, true, true, &kArm.sprite, 3.0f},
+        {1, 7.0f, -1.0f, 1.1f, false, true, &kMallet.sprite, 0.8f},
+        {2, 4.0f, 0.0f, 0.0f, false, true, &kMallet.sprite},
+    };
+    SD_Xform world[4];
+    SD_Rig rig(bones, world, 4);
+    CHECK(rig.pose(), "a scaled chain: pose() refused");
+    // by hand: each pivot is its parent's plus its offset mirrored, turned
+    // and scaled by the parent's accumulated mirror, angle and scale
+    double px = 30.0, py = 25.0, ang = 0.3, sc = 0.5, mirror = 1.0;
+    long bad = 0;
+    for (int i = 0; i < 4; ++i) {
+      if (i > 0) {
+        const double ox = mirror * bones[i].ox, oy = bones[i].oy;
+        const double nx = px + sc * (cos(ang) * ox - sin(ang) * oy);
+        const double ny = py + sc * (sin(ang) * ox + cos(ang) * oy);
+        px = nx;
+        py = ny;
+        ang += mirror * bones[i].angle;
+        sc *= bones[i].scale;
+      }
+      if (bones[i].flipX) mirror = -mirror;
+      SD_Xform want;
+      want.a = (float)(mirror * sc * cos(ang));
+      want.b = (float)(-sc * sin(ang));
+      want.c = (float)(mirror * sc * sin(ang));
+      want.d = (float)(sc * cos(ang));
+      want.tx = (float)px;
+      want.ty = (float)py;
+      if (!nearXform(rig.world(i), want, 1e-5, 1e-4)) ++bad;
+    }
+    CHECK(bad == 0, "a scaled, mirrored chain differs from the hand pose at %ld bones", bad);
+    float x, y;
+    rig.world(3).apply(0.0f, 0.0f, &x, &y);
+    float ex, ey;
+    rig.world(2).apply(0.0f, 0.0f, &ex, &ey);
+    CHECK(near(hypot(x - ex, y - ey), 4.0 * 0.5 * 3.0 * 0.8, 1e-4),
+          "a bone pinned 4 px out under scales 0.5, 3 and 0.8 lands %g px out, not 4.8",
+          hypot(x - ex, y - ey));
+  }
+
+  // ---- a bone of scale 0 or below: posed onto its pivot, never drawn, nor anything under it ----
+  {
+    const float zeros[3] = {0.0f, -1.0f, NAN};
+    for (float z : zeros) {
+      const SD_Bone bones[3] = {
+          {-1, 20.0f, 15.0f, 0.3f, false, true, &kArm.sprite, z},
+          {0, 15.0f, 0.0f, 0.2f, false, true, &kMallet.sprite},
+          {-1, 40.0f, 30.0f, -0.4f, false, true, &kFlag.sprite},
+      };
+      SD_Xform world[3];
+      SD_Rig rig(bones, world, 3);
+      CHECK(rig.pose(), "scale %g: pose() refused", z);
+      const SD_Xform &w0 = rig.world(0), &w1 = rig.world(1);
+      CHECK(w0.a == 0.0f && w0.b == 0.0f && w0.c == 0.0f && w0.d == 0.0f && w0.tx == 20.0f &&
+                w0.ty == 15.0f && w1.a == 0.0f && w1.b == 0.0f && w1.c == 0.0f && w1.d == 0.0f &&
+                w1.tx == 20.0f && w1.ty == 15.0f,
+            "scale %g: the bone and its child not posed with a zero linear part on its pivot", z);
+      OwnedCanvas got(64, 48), want(64, 48);
+      checker(got.canvas);
+      checker(want.canvas);
+      rig.draw(got.canvas);
+      sd_draw(want.canvas, kFlag.sprite, rig.world(2));
+      TrapCount none;
+      CHECK(!sd_draw(none, kArm.sprite, w0) && !sd_draw(none, kMallet.sprite, w1) &&
+                none.plots == 0,
+            "scale %g: sd_draw took the bone or its child", z);
+      CHECK(sameCanvas(got.canvas, want.canvas),
+            "scale %g: the bone or its child drawn, or the other root not", z);
+    }
+  }
+
   // ---- goldens: the arm, arm and mallet chain at the pinned poses ----
   for (int p = 0; p < kRigPoseCount; ++p)
     for (int qi = 0; qi < 2; ++qi) {
@@ -338,5 +515,18 @@ void runRigTests() {
       const uint64_t h = rigHash(kRigPoseDeg[p], kRigPoseFlip[p], q, label);
       CHECK(h == GOLDEN_RIG[p][qi], "%s: hash 0x%016llxULL != pinned 0x%016llxULL", label,
             (unsigned long long)h, (unsigned long long)GOLDEN_RIG[p][qi]);
+    }
+
+  // ---- goldens: the chain scaled ----
+  for (int k = 0; k < kRigScaleCount; ++k)
+    for (int qi = 0; qi < 2; ++qi) {
+      const SD_Sample q = qi == 0 ? SD_SAMPLE_1 : SD_SAMPLE_2x2;
+      char label[64];
+      std::snprintf(label, sizeof(label), "rig_scaled_%g_%g_%g%s_%s", kRigScale[k][0],
+                    kRigScale[k][1], kRigScale[k][2], kRigScaleFlip[k] ? "_mirrored" : "",
+                    qi == 0 ? "1x" : "2x2");
+      const uint64_t h = rigHash(kRigPoseDeg[1], kRigScaleFlip[k], q, label, kRigScale[k]);
+      CHECK(h == GOLDEN_RIG_SCALED[k][qi], "%s: hash 0x%016llxULL != pinned 0x%016llxULL", label,
+            (unsigned long long)h, (unsigned long long)GOLDEN_RIG_SCALED[k][qi]);
     }
 }

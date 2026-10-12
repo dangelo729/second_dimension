@@ -30,6 +30,7 @@ sd_drawInk	KEYWORD2
 sd_stampOutline	KEYWORD2
 sd_drawGroup	KEYWORD2
 rigid	KEYWORD2
+scaled	KEYWORD2
 compose	KEYWORD2
 inverse	KEYWORD2
 apply	KEYWORD2
