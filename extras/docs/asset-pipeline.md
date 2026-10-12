@@ -64,6 +64,21 @@ alpha: the artist never loses the pixel under the pivot. Then File > Export
 read; if an indexed export is refused for its bit depth, export from RGB
 colour mode (Sprite > Color Mode > RGB Color) instead.
 
+## Pieces drawn as a group
+
+A piece drawn by `sd_drawGroup` (several sprites drawn as one shape, an arm of
+segments and joints, say) is drawn **solid**: its mask is the whole shape and
+its ink is interior detail only, never the outline. The group derives one
+outline from the union of its pieces' shapes (conventions.md, R8), so two
+pieces that overlap show no line between them. In Aseprite: fill the shape in
+black, draw any crease or finger line inside it in white, and leave the edge
+black: the edge is drawn for you. End a piece round where it meets another at
+a joint, and give the joint a round disc of its own, so the contour stays
+smooth as the pieces turn.
+
+A piece drawn with its own white outline still converts and draws, but in a
+group that outline becomes interior detail wherever another piece covers it.
+
 ## What the converter does (the contract)
 
 Stable across tool versions; the host suite pins it.

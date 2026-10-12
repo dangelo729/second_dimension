@@ -5,7 +5,8 @@
 //
 // this umbrella includes the dependency-free core: the sprite format, the
 // transform, the target seam with its 1-bit canvas, the blit, the rig of
-// bones and the two-bone ik. the core needs nothing beyond the c standard
+// bones, the two-bone ik and the group (several sprites drawn as one shape
+// with one derived outline). the core needs nothing beyond the c standard
 // headers (and arduino.h on teensy, for SD_PROGMEM), which is what lets the
 // full test suite run on a host pc. for an adafruit_gfx display include
 // SecondDimension_GFX.h instead.
@@ -20,5 +21,6 @@
 #include "SD_Draw.h"
 #include "SD_Rig.h"
 #include "SD_IK.h"
+#include "SD_Group.h"
 
 #endif  // SECONDDIMENSION_H

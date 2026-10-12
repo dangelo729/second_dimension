@@ -55,6 +55,7 @@ void runXformTests();
 void runDrawTests();
 void runRigTests();
 void runIkTests();
+void runGroupTests();
 void runConvertTests();
 
 #endif  // SD_TEST_COMMON_H

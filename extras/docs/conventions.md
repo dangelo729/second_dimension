@@ -1,6 +1,6 @@
 # Coordinate & rig conventions
 
-Seven rules, fixed. Everything in the library — the blit, the transform, the
+Eight rules, fixed. Everything in the library — the blit, the transform, the
 rig, the IK, the golden test suite — assumes exactly these. Each rule ends
 with what breaks if you assume otherwise, because that is how convention
 bugs present.
@@ -142,3 +142,40 @@ marked invisible for `draw()` and drawn afterwards with `sd_draw` through
 reordered for you — the rig refuses it and stops drawing there; and
 expecting a parent to cover its children (or a later root to sit behind an
 earlier one) gets the opposite.
+
+## R8 — A group's outline is derived from the union of its pieces
+
+`sd_drawGroup` draws a group of bones as one shape. Each listed bone's sprite
+goes into two scratch canvases through its posed world transform, by
+`sd_draw`'s own sampling: its mask into the silhouette (every pixel any
+masked sample lands on), its ink into the ink canvas (every pixel a masked
+sample with ink lands on). Then the group's box is stamped onto the target.
+The shape is the silhouette's set pixels and its pinholes: an unset pixel
+whose four neighbours are all set, which pieces sampled apart can leave
+where their edges meet (in the crook of a bent elbow, say), is the shape's,
+not a hole. A shape pixel with any of its four neighbours outside the shape
+is the outline and plots lit; any other shape pixel plots lit where the ink
+canvas has it and dark elsewhere; a pixel outside the shape is never
+plotted. A neighbour outside the canvas is outside the shape, so a shape at
+the canvas's edge is outlined there; a hole of two pixels or more is
+outlined round its rim. The scratch canvases are in the target's pixels and
+caller-owned; the box is every pixel the listed bones' `sd_draw` could
+visit, both canvases are cleared over it grown by two, and it is stamped
+grown by one. The outline is 1 px wide whatever the sampling and whatever
+the angle, and closed: it is the edge of a set of pixels, not a stroke that
+was turned.
+
+So a group piece's art is its solid shape: the mask is the shape, and the ink
+is interior detail only (a crease, finger lines). Where pieces overlap, the
+union has no edge, so no line shows there. Joints read smooth at any angle
+when the pieces meeting there end round and a disc covers the joint.
+
+A group draws its bones whatever their `visible` flag says, and the rig's
+`draw()` still draws every visible bone; mark a group's bones invisible and
+draw the group after `draw()` (the R7 pattern).
+
+*If you assume otherwise:* drawing a piece with its own outline puts that
+outline inside the shape wherever another piece covers it, which is exactly
+the seam a group exists to remove; handing the group canvases smaller than
+the target clips the group to them; and listing a group's bones as visible
+draws them twice, once outlined each on its own.

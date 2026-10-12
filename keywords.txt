@@ -25,6 +25,10 @@ sd_validateSprite	KEYWORD2
 sd_spritePixel	KEYWORD2
 sd_validateRig	KEYWORD2
 sd_ik2	KEYWORD2
+sd_drawSilhouette	KEYWORD2
+sd_drawInk	KEYWORD2
+sd_stampOutline	KEYWORD2
+sd_drawGroup	KEYWORD2
 rigid	KEYWORD2
 compose	KEYWORD2
 inverse	KEYWORD2

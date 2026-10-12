@@ -10,6 +10,42 @@ explaining why the pins moved, and any change to the `SD_Sprite` layout is a new
 format number plus a MAJOR bump. During 0.x, MINOR releases may break API; breaks are
 called out under a "Breaking" heading.
 
+## [0.2.0] - unreleased
+
+### Added
+
+- **Groups: one shape, one derived outline** (`SD_Group.h`). Several sprites drawn as
+  one shape: an arm of segments and round joints reads as one continuous arm at any
+  angle, with no line where its pieces overlap. `sd_drawSilhouette(scratch, sprite,
+  xform, sample)` sets every pixel `sd_draw` would plot (the solid shape, ink
+  ignored) and `sd_drawInk` every pixel it would plot lit; both are `sd_draw` itself,
+  through a scratch canvas, so the sampling is the blit's own.
+  `sd_stampOutline(target, silhouette, ink, x0, y0, x1, y1)` stamps a box. The shape
+  is the silhouette and its pinholes (an unset pixel whose four neighbours are all
+  set: pieces sampled apart leave one where their edges meet, as in the crook of an
+  elbow). A shape pixel with any 4-neighbour outside the shape (outside the canvas
+  counts as outside) plots lit, any other shape pixel lit where the ink canvas has it
+  and dark elsewhere, and a pixel outside the shape is left alone; a hole of two
+  pixels or more is outlined. `sd_drawGroup(target,
+  rig, table, bones, n, silhouette, ink, sample)` clears both caller-owned scratch
+  canvases over the group's box, draws every listed bone's silhouette and ink through
+  its posed world transform, and stamps; the bone table it reads sprites from is the
+  one the rig was built over (the rig has no read access to its bones), and a listed
+  bone's `visible` flag is not read, so a bone drawn by its group is marked invisible
+  for the rig's own draw. Nothing allocates; `SD_Bone`, `SD_Rig` and the draw path are
+  unchanged.
+- **The art convention for a group piece** (`extras/docs/asset-pipeline.md`,
+  `extras/docs/conventions.md` R8): the mask is the solid shape, the ink interior
+  detail only; the outline is derived.
+- **The group suite** (`test/host/test_group.cpp`): the silhouette and the ink are
+  `sd_draw`'s plotted and lit pixels for every fixture at the golden poses; a lone
+  rectangle is a 1 px outline round a dark inside; two overlapping rectangles give one
+  contour with no line inside; interior ink shows; a shape at the canvas's edge is
+  outlined there; a pinhole is filled and a two-pixel hole outlined; nothing outside
+  the shape is touched on a dark, a lit or a checker background; no plot falls outside the target; the refusals; and golden
+  frames of a two-segment arm with a round elbow disc at six poses in both samplings,
+  new pins. No existing pin moved.
+
 ## [0.1.0] - unreleased
 
 ### Added

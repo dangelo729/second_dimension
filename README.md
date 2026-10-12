@@ -6,11 +6,12 @@
 any angle about its pivot and posed as bones, on small OLED and TFT displays, in the
 spirit of Adafruit GFX and the shape of its sibling ThirdDimension.
 
-> **Status: pre-release (v0.1.0).** The sprite format, the transform, the target seam
-> with its 1-bit canvas, the blit, the PNG converter, the rig of bones, the two-bone IK
-> and the Adafruit_GFX adapter exist; the host suite passes with bit-exact golden pins,
-> and the example sketch compiles for Teensy 4.1. Nothing has run on a board yet: no
-> frame has been seen on a panel and no time has been measured.
+> **Status: pre-release (v0.2.0).** The sprite format, the transform, the target seam
+> with its 1-bit canvas, the blit, the PNG converter, the rig of bones, the two-bone IK,
+> groups drawn as one shape with a derived outline, and the Adafruit_GFX adapter exist;
+> the host suite passes with bit-exact golden pins, and the example sketch compiles for
+> Teensy 4.1. Nothing has run on a board yet: no frame has been seen on a panel and no
+> time has been measured.
 
 ---
 
@@ -29,6 +30,10 @@ spirit of Adafruit GFX and the shape of its sibling ThirdDimension.
   chain under it mirrors.
 - A closed-form two-bone IK, `sd_ik2`, that aims an arm's two angles at a point, either
   elbow, and says whether it reached.
+- Groups, `sd_drawGroup`: several bones drawn as one shape, its one 1 px outline derived
+  from the union of their shapes, so an arm of segments and round joints reads as one
+  continuous arm at any angle, with no line where its pieces overlap. Two caller-owned
+  scratch canvases hold the shape and its interior ink while it is stamped.
 - A sprite format in Adafruit_GFX `drawBitmap`'s row layout: two planes, ink and mask,
   so an unturned sprite is exactly what `drawBitmap` draws, and black pixels can cover
   what is under them.
@@ -144,6 +149,12 @@ PNG (Aseprite export, one pivot pixel)
   `sd_validateRig` and `pose()` refuse anything else. `draw()` blits in array order, so
   later bones paint over earlier ones. A bone with no sprite is a pure joint: posed,
   never drawn.
+- **A group is one shape.** `sd_drawGroup(target, rig, table, bones, n, silhouette, ink)`
+  draws the listed bones' masks into a silhouette canvas and their ink into an ink
+  canvas (both `sd_draw`'s own sampling, via `sd_drawSilhouette` and `sd_drawInk`), then
+  `sd_stampOutline` plots the silhouette's edge lit and its inside dark but for the ink.
+  A group piece's art is solid: the mask is the shape, the ink interior detail only.
+  Mark a group's bones invisible so `draw()` leaves them to the group.
 - **IK aims a chain in its own frame.** `sd_ik2(l1, l2, tx, ty, bendSign, a1, a2)` gives
   the chain's first bone's angle and its child's, for a target in the frame the chain
   hangs in (the panel minus the shoulder, for a root); out of reach it points straight
@@ -218,6 +229,8 @@ rather than misread. The full contract is in
 - A canvas is `(w + 7) / 8 x h` bytes, caller-owned: 1 KB at 128x64.
 - `sd_draw` costs the turned box's pixels times the samples: a 20x20 sprite at any
   angle is about 900 pixels, 3600 samples; `pose()` is one matrix compose per bone.
+  A group costs two `sd_draw`s a bone (shape and ink), and a clear and a stamp of its
+  box; its two scratch canvases are caller-owned, 1 KB each at 128x64.
   Nothing has been measured on a board.
 
 ## Testing
@@ -230,8 +243,11 @@ make -C test/host run
 ```
 
 It pins bit-exact FNV-1a frame hashes of three fixture sprites at 0, 20, 45, 70, 90
-and 180 degrees and mirrored, in both samplings, and of an arm-arm-mallet rig at five
-poses; reproduces the scratch mockup the 2x2 default came from; fuzzes clipping against
+and 180 degrees and mirrored, in both samplings, of an arm-arm-mallet rig at five
+poses, and of a group (two segments and a round elbow disc drawn as one shape) at six;
+checks that a group's silhouette and ink are `sd_draw`'s own pixels, that overlapping
+pieces give one contour with no line inside, and that nothing outside the shape is
+touched; reproduces the scratch mockup the 2x2 default came from; fuzzes clipping against
 a brute-force pass over exactly-sized heap planes; checks the rig against a pose worked
 by hand, its refusals, its draw order, its pure joints and its mirroring; checks
 `sd_ik2` by forward kinematics over a grid of targets, both elbows, out of reach and too

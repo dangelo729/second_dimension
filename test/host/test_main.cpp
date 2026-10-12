@@ -60,6 +60,7 @@ int main() {
   runSuite("draw", runDrawTests);
   runSuite("rig", runRigTests);
   runSuite("ik", runIkTests);
+  runSuite("group", runGroupTests);
   runSuite("convert", runConvertTests);
 
   if (failures == 0)

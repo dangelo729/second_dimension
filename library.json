@@ -1,7 +1,7 @@
 {
   "name": "SecondDimension",
-  "version": "0.1.0",
-  "description": "Tiny articulated 1-bit sprite library for 32-bit microcontrollers, in the spirit of Adafruit GFX. 1-bit sprites with a mask, converted from PNG art, drawn at any angle about a pivot and mirrored through a 2x3 affine, with 2x2 OR sampling so 1 px lines survive the turn; rigs of bones posed parents first and drawn in order; a closed-form two-bone IK; through a small render-target seam with a 1-bit canvas in drawBitmap's layout and an optional Adafruit GFX adapter. Nothing allocates. Requires hardware float; not for AVR.",
+  "version": "0.2.0",
+  "description": "Tiny articulated 1-bit sprite library for 32-bit microcontrollers, in the spirit of Adafruit GFX. 1-bit sprites with a mask, converted from PNG art, drawn at any angle about a pivot and mirrored through a 2x3 affine, with 2x2 OR sampling so 1 px lines survive the turn; rigs of bones posed parents first and drawn in order; a closed-form two-bone IK; groups of sprites drawn as one shape with one outline derived from their union; through a small render-target seam with a 1-bit canvas in drawBitmap's layout and an optional Adafruit GFX adapter. Nothing allocates. Requires hardware float; not for AVR.",
   "keywords": [
     "sprite",
     "graphics",
