@@ -4,7 +4,7 @@
 
 // the fixture sprites, authored as ascii rows, and the helpers the suites
 // share: exact-size heap copies (so asan sees any read past a plane), a
-// reference drawBitmap-style copy, and the scratch mockup's layout.
+// reference drawBitmap-style copy, and the mockup frame's layout.
 
 #include <stdint.h>
 #include <string.h>
@@ -68,7 +68,7 @@ struct ArtFixture {
   }
 };
 
-// the scratch mockup's outlined arm, pivot on its shoulder pixel (0, 3).
+// an outlined arm, pivot on its shoulder pixel (0, 3).
 inline const ArtFixture kArm("arm",
                              {
                                  "..############..",
@@ -81,7 +81,7 @@ inline const ArtFixture kArm("arm",
                              },
                              0, 3);
 
-// the scratch mockup's mallet, pivot on the end of its handle (0, 2).
+// a mallet, pivot on the end of its handle (0, 2).
 inline const ArtFixture kMallet("mallet",
                                 {
                                     ".......#####",
@@ -163,20 +163,19 @@ inline void referenceDraw(SD_Canvas &c, const SD_Sprite &s, int16_t x, int16_t y
 
 inline float degToRad(float deg) { return deg * 0.017453292519943295f; }
 
-// the scratch mockup's frame, 160x80: tiles 40 px wide at 0, 20, 45 and 70
-// degrees, the top row SD_SAMPLE_1 and the bottom row SD_SAMPLE_2x2. the
-// arm's pivot, its shoulder pixel (0, 3), sits at (tile * 40 + 8, row * 40 +
-// 20) and the mallet's pivot (0, 2) at the mockup's round(15 cos a),
-// round(15 sin a) from it, at the same angle.
+// the mockup frame, 160x80: the arm and the mallet in tiles 40 px wide at 0,
+// 20, 45 and 70 degrees, the top row SD_SAMPLE_1 and the bottom row
+// SD_SAMPLE_2x2. the arm's pivot, its shoulder pixel (0, 3), sits at
+// (tile * 40 + 8, row * 40 + 20) and the mallet's pivot (0, 2) at
+// (round(15 cos a), round(15 sin a)) from it, at the same angle.
 inline constexpr int kMockupW = 160;
 inline constexpr int kMockupH = 80;
 inline constexpr int kMockupDeg[4] = {0, 20, 45, 70};
 inline constexpr int kMockupMallet[4][2] = {{15, 0}, {14, 5}, {11, 11}, {5, 14}};
 
-// pinned: the scratch mockup's frame drawn by drawMockup with the arm and
-// the mallet, at 0, 20, 45 and 70 degrees, 1x on the top row and 2x2 on the
-// bottom, on a 160x80 canvas cleared dark. the draw suite pins it with the
-// ascii arm, the converter suite with the arm converted from arm.png.
+// pinned: the mockup frame drawn by drawMockup on a canvas cleared dark. the
+// draw suite pins it with the ascii arm, the converter suite with the arm
+// converted from arm.png.
 inline constexpr uint64_t GOLDEN_MOCKUP = 0x273a8853f28c84adULL;
 
 inline void drawMockup(SD_Canvas &c, const SD_Sprite &armSprite, const SD_Sprite *mallet) {

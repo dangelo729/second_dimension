@@ -5,6 +5,8 @@
 #include <float.h>
 #include <math.h>
 
+#include "SD_Internal.h"
+
 // true for every float but nan and the infinities.
 static inline bool sdFinite(float v) { return v >= -FLT_MAX && v <= FLT_MAX; }
 
@@ -43,9 +45,8 @@ SD_Xform SD_Xform::compose(const SD_Xform &p, const SD_Xform &q) {
 }
 
 SD_Xform SD_Xform::inverse() const {
-  const SD_Xform zero = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
   const float det = a * d - b * c;
-  if (det == 0.0f) return zero;
+  if (det == 0.0f) return kSDZero;
   SD_Xform m;
   m.a = d / det;
   m.b = -b / det;
@@ -55,6 +56,6 @@ SD_Xform SD_Xform::inverse() const {
   m.ty = -(m.c * tx + m.d * ty);
   if (!sdFinite(m.a) || !sdFinite(m.b) || !sdFinite(m.c) || !sdFinite(m.d) ||
       !sdFinite(m.tx) || !sdFinite(m.ty))
-    return zero;
+    return kSDZero;
   return m;
 }

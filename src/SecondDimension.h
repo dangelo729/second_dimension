@@ -1,15 +1,12 @@
 // SPDX-License-Identifier: MIT
 //
-// SecondDimension: a tiny articulated-sprite library for 32-bit
-// microcontrollers, in the spirit of adafruit gfx.
+// SecondDimension: articulated 1-bit sprites for 32-bit microcontrollers.
 //
-// this umbrella includes the dependency-free core: the sprite format, the
-// transform, the target seam with its 1-bit canvas, the blit, the rig of
-// bones, the two-bone ik and the group (several sprites drawn as one shape
-// with one derived outline). the core needs nothing beyond the c standard
-// headers (and arduino.h on teensy, for SD_PROGMEM), which is what lets the
-// full test suite run on a host pc. for an adafruit_gfx display include
-// SecondDimension_GFX.h instead.
+// the core, with no dependency: the sprite, the transform, the target and
+// its 1-bit canvas, the blit, the rig, the two-bone ik and the group. it
+// needs only the c standard headers (and arduino.h on teensy, for
+// SD_PROGMEM), so it also builds on a host pc. for an adafruit_gfx display
+// include SecondDimension_GFX.h instead.
 #ifndef SECONDDIMENSION_H
 #define SECONDDIMENSION_H
 

@@ -2,7 +2,7 @@
 
 #include "SD_Group.h"
 
-#include <math.h>
+#include "SD_Internal.h"
 
 namespace {
 
@@ -22,35 +22,10 @@ class Scratch : public SD_Target {
   bool inkOnly_;
 };
 
-bool zero(const SD_Xform &m) {
-  return m.a == 0.0f && m.b == 0.0f && m.c == 0.0f && m.d == 0.0f && m.tx == 0.0f &&
-         m.ty == 0.0f;
-}
-
-// the pixels sd_draw could visit for a sprite through m, unclipped: its
-// pixel area about the pivot by its four corners, floored and ceiled, as
-// sd_draw takes its box. false for a box that is not finite.
+// sd_draw's box for a sprite through m, unclipped; false for a box that is
+// not finite.
 bool boxOf(const SD_Sprite &s, const SD_Xform &m, float &bx0, float &by0, float &bx1, float &by1) {
-  const float x0 = -0.5f - (float)s.pivotX;
-  const float y0 = -0.5f - (float)s.pivotY;
-  const float x1 = (float)s.w - 0.5f - (float)s.pivotX;
-  const float y1 = (float)s.h - 0.5f - (float)s.pivotY;
-  float cx[4], cy[4];
-  m.apply(x0, y0, &cx[0], &cy[0]);
-  m.apply(x1, y0, &cx[1], &cy[1]);
-  m.apply(x0, y1, &cx[2], &cy[2]);
-  m.apply(x1, y1, &cx[3], &cy[3]);
-  float minx = cx[0], maxx = cx[0], miny = cy[0], maxy = cy[0];
-  for (int k = 1; k < 4; ++k) {
-    if (cx[k] < minx) minx = cx[k];
-    if (cx[k] > maxx) maxx = cx[k];
-    if (cy[k] < miny) miny = cy[k];
-    if (cy[k] > maxy) maxy = cy[k];
-  }
-  bx0 = floorf(minx);
-  by0 = floorf(miny);
-  bx1 = ceilf(maxx);
-  by1 = ceilf(maxy);
+  sdBox(s, m, bx0, by0, bx1, by1);
   return bx0 == bx0 && by0 == by0 && bx1 == bx1 && by1 == by1 && bx0 > -1e9f && by0 > -1e9f &&
          bx1 < 1e9f && by1 < 1e9f;
 }
@@ -105,7 +80,7 @@ bool sd_drawGroup(SD_Target &target, const SD_Rig &rig, const SD_Bone *table, co
                   int n, SD_Canvas &silhouette, SD_Canvas &ink, SD_Sample sample) {
   if (table == nullptr || bones == nullptr || n < 0) return false;
   for (int k = 0; k < n; ++k)
-    if (zero(rig.world(bones[k]))) return false;
+    if (sdIsZero(rig.world(bones[k]))) return false;
 
   // the box: every listed bone's, clipped to the target and both canvases,
   // cleared grown by two (the stamp reads a pixel's neighbours' neighbours)

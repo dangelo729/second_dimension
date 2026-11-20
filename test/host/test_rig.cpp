@@ -12,9 +12,9 @@
 // matrix, a child pinned 15 px out under a parent of scale 0.5 landing 7.5
 // px out, scale under a mirror and under a turned parent, a scaled chain
 // against a pose worked by hand, a bone of scale 0 or below posed onto its
-// pivot and never drawn, nor anything under it); golden frames of the stage
-// 0 arm and mallet fixtures as a chain at pinned angles, every bone at scale
-// 1 by default; and golden frames of that chain scaled.
+// pivot and never drawn, nor anything under it); golden frames of the arm
+// and mallet fixtures as a chain at pinned angles, every bone at scale 1 by
+// default; and golden frames of that chain scaled.
 
 #include <math.h>
 #include <string.h>

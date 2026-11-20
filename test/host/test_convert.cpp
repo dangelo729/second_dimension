@@ -10,14 +10,14 @@
 // the shoulder pixel black and clear; reading.png pins the frozen colour
 // reading pixel by pixel; 16-bit, interlaced, unknown-critical-chunk and
 // two-pivot pngs are refused with a message and no output. --silhouette:
-// outlined.png (an opaque rgb drawing like daedalus's head, a closed 1 px
-// outline on black touching all four edges, a face inside) converts to the
+// outlined.png (an opaque rgb drawing of a head, a closed 1 px outline on
+// black touching all four edges, a face inside) converts to the
 // filled shape with only the face in ink, and drawn alone as a group gives
 // back the plain conversion's pixels; outlined_gap.png (one outline pixel
 // black) is refused; arm.png (alpha outside) converts to the pinned planes;
 // a png not among those given is refused. the pinned header itself is
-// compiled in: it validates, its planes are the mockup's arm, and drawn at
-// the mockup's angles it is the mockup's frame.
+// compiled in: it validates, its planes are the ascii arm's, and drawn in
+// the mockup frame it gives the pinned frame.
 
 #include <stdlib.h>
 #include <string.h>
@@ -452,10 +452,10 @@ void runConvertTests() {
     const size_t n = (size_t)((arm.w + 7) / 8) * (size_t)arm.h;
     CHECK(sizeof(arm_ink) == n && sizeof(arm_mask) == n, "arm_expected.h: plane sizes");
     CHECK(memcmp(arm.ink, kArm.sprite.ink, n) == 0 && memcmp(arm.mask, kArm.sprite.mask, n) == 0,
-          "arm_expected.h: planes differ from the mockup's ascii arm");
+          "arm_expected.h: planes differ from the ascii arm");
 
-    // drawn at the mockup's angles, the converted arm is the mockup's arm,
-    // and with the mallet the mockup's frame
+    // drawn in the mockup frame, the converted arm is the ascii arm, and
+    // with the mallet it is the pinned frame
     OwnedCanvas fromPng(kMockupW, kMockupH), fromArt(kMockupW, kMockupH);
     fromPng.canvas.clear(false);
     fromArt.canvas.clear(false);
@@ -463,7 +463,7 @@ void runConvertTests() {
     drawMockup(fromArt.canvas, kArm.sprite, nullptr);
     writeFrame(fromPng.canvas, "convert_arm_mockup");
     CHECK(memcmp(fromPng.canvas.buffer(), fromArt.canvas.buffer(), fromPng.canvas.bytes()) == 0,
-          "converted arm at the mockup's angles differs from the ascii arm");
+          "converted arm in the mockup frame differs from the ascii arm");
     fromPng.canvas.clear(false);
     drawMockup(fromPng.canvas, arm, &kMallet.sprite);
     const uint64_t h = canvasHash(fromPng.canvas, "convert_mockup");

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 // draw suite: the canvas's layout; identity (angle 0 at an integer position,
 // 1x and 2x2, is the art pixel for pixel and equals a drawBitmap-style
-// copy); golden frames of every fixture at the pinned poses; the scratch
-// mockup's frame; clipping (half off each edge, wholly off, a 1x1 target,
+// copy); golden frames of every fixture at the pinned poses; the mockup
+// frame; clipping (half off each edge, wholly off, a 1x1 target,
 // and a fuzz against a brute-force pass over the whole target, all through a
 // target that counts out-of-bounds plots, over exactly-sized heap planes);
 // the refusals (a bad sprite, a matrix with no finite inverse); and scale:
@@ -400,7 +400,7 @@ void runDrawTests() {
     }
   }
 
-  // ---- the scratch mockup's frame ----
+  // ---- the mockup frame ----
   {
     OwnedCanvas oc(kMockupW, kMockupH);
     oc.canvas.clear(false);

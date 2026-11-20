@@ -2,7 +2,7 @@
 
 #include "SD_Rig.h"
 
-static const SD_Xform kZero = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+#include "SD_Internal.h"
 
 bool sd_validateRig(const SD_Bone *bones, int count) {
   if (count < 0) return false;
@@ -15,7 +15,7 @@ bool sd_validateRig(const SD_Bone *bones, int count) {
 SD_Rig::SD_Rig(const SD_Bone *bones, SD_Xform *world, int count)
     : bones_(bones), world_(world), count_(count > 0 ? count : 0) {
   if (world_ != nullptr)
-    for (int i = 0; i < count_; ++i) world_[i] = kZero;
+    for (int i = 0; i < count_; ++i) world_[i] = kSDZero;
 }
 
 bool SD_Rig::pose() {
@@ -23,7 +23,7 @@ bool SD_Rig::pose() {
   for (int i = 0; i < count_; ++i) {
     const SD_Bone &b = bones_[i];
     if (b.parent < -1 || b.parent >= i) {
-      for (int k = i; k < count_; ++k) world_[k] = kZero;
+      for (int k = i; k < count_; ++k) world_[k] = kSDZero;
       return false;
     }
     const SD_Xform local = SD_Xform::scaled(b.ox, b.oy, b.angle, b.flipX, b.scale);
@@ -41,6 +41,6 @@ void SD_Rig::draw(SD_Target &target, SD_Sample sample) const {
 }
 
 const SD_Xform &SD_Rig::world(int i) const {
-  if (world_ == nullptr || i < 0 || i >= count_) return kZero;
+  if (world_ == nullptr || i < 0 || i >= count_) return kSDZero;
   return world_[i];
 }

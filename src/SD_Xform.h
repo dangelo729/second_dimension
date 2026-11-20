@@ -8,42 +8,36 @@
 //     x' = a x + b y + tx
 //     y' = c x + d y + ty
 // in adafruit_gfx's frame: x right, y down, so a positive angle turns
-// clockwise on the panel. integer coordinates name pixel centres.
+// clockwise on the panel. integer coordinates name pixel centres. sd_draw
+// subtracts the sprite's pivot before the matrix, so the matrix's origin is
+// the pivot pixel's centre.
 //
-// a sprite's transform maps pivot-relative coordinates: sd_draw subtracts
-// the sprite's pivot from a sprite pixel before the matrix, so the origin of
-// the matrix is the pivot pixel's centre and the constructors never need to
-// know the pivot.
-//
-// the exact float expressions here and in sd_draw are pinned by the host
-// suite's golden hashes: never reorder or regroup them.
+// the host suite pins the float expressions here and in sd_draw bit for
+// bit, built with -ffp-contract=off (test/host/Makefile): never reorder or
+// regroup them. a board's own compiler flags may fuse multiply-adds, so a
+// board build is not held to the pins: a sample on a rounding edge may land
+// on the neighbouring pixel.
 struct SD_Xform {
   float a, b, c, d, tx, ty;
 
-  // a turn by angle (radians, clockwise on the panel) about the origin,
-  // mirrored in x first when flipX, then a move to (x, y): the pivot lands
-  // on (x, y). a sprite pixel (sx, sy) of a sprite with pivot (px, py) goes
-  // to dx = sx - px (negated when flipX), dy = sy - py, then
+  // a turn by angle (radians, clockwise on the panel), mirrored in x first
+  // when flipX, then a move that lands the pivot on (x, y). a sprite pixel
+  // (sx, sy) with pivot (px, py) goes to dx = sx - px (negated when flipX),
+  // dy = sy - py, then
   //     x' = x + cos(angle) dx - sin(angle) dy
   //     y' = y + sin(angle) dx + cos(angle) dy
   static SD_Xform rigid(float x, float y, float angle, bool flipX = false);
 
-  // rigid with the pivot-relative sprite pixels scaled by scale first: a
-  // uniform scale, then the mirror, the turn and the move, so the pivot
-  // still lands on (x, y) and a sprite pixel spans scale target pixels.
-  // each of a, b, c, d is rigid's times scale and tx, ty are rigid's, so
-  // scaled(x, y, angle, flipX, 1) is rigid(x, y, angle, flipX) bit for bit
-  // (a product with 1.0f is exact). a scale of 0 or below, or nan, is taken
-  // as 0: a zero linear part with the pivot still on (x, y), which sd_draw
+  // rigid with the sprite pixels scaled about the pivot first: a, b, c, d
+  // are rigid's times scale, so scale 1 is rigid bit for bit. a scale of 0
+  // or below, or nan, is taken as 0: a zero linear part, which sd_draw
   // refuses.
   static SD_Xform scaled(float x, float y, float angle, bool flipX, float scale);
 
   // child first, then parent: compose(p, q).apply(v) is p.apply(q.apply(v)).
   static SD_Xform compose(const SD_Xform &parent, const SD_Xform &child);
 
-  // the inverse matrix. a matrix with no finite inverse (determinant zero,
-  // or any entry of the result not finite) inverts to all zeros, which no
-  // invertible matrix's inverse can be.
+  // the inverse matrix, or the zero matrix when there is no finite inverse.
   SD_Xform inverse() const;
 
   void apply(float x, float y, float *ox, float *oy) const {
