@@ -21,10 +21,9 @@ the standard rotation matrix, read in a y-down frame. At +90° the sprite's +x
 points down the panel. The sprites, the bones and `sd_ik2` all share this one
 frame; there is no second convention anywhere.
 
-*If you assume otherwise:* the y-up habit from maths (or from a 3D world,
-such as ThirdDimension's) turns every angle the wrong way and mirrors every
-point you hand over. Flip y once, where a y-up world's numbers enter, and
-nowhere else.
+*If you assume otherwise:* the y-up habit from maths (or from a 3D world)
+turns every angle the wrong way and mirrors every point you hand over. Flip
+y once, where a y-up world's numbers enter, and nowhere else.
 
 ## R2 — Integer coordinates name pixel centres
 
@@ -33,7 +32,10 @@ target and in a sprite alike. `sd_draw` carries each target pixel's centre
 (or its four sample points at ±0.25 px) back into the sprite and rounds to
 the nearest sprite pixel with `floorf(u + 0.5f)`. So a sprite at angle 0 at
 an integer position reproduces the art pixel for pixel, and at 90, 180 and
-270 degrees it is the art turned, exactly.
+270 degrees it is the art turned, exactly, under either sampling. At other
+angles one sample a pixel (`SD_SAMPLE_1`, nearest neighbour) leaves gaps in
+1 px lines; four (`SD_SAMPLE_2x2`, the default) keep them whole at the cost
+of a little weight.
 
 *If you assume otherwise:* treating integers as pixel corners puts every
 part half a pixel off, and an unturned sprite placed at a half-integer

@@ -21,7 +21,7 @@ test/host/sd_host_tests
 scratch/
 scratch-*/
 
-# plan documents and AI-assistant config: local working notes, never committed
+# local working notes, never committed
 PLAN.md
 *PLAN*.md
 plans/

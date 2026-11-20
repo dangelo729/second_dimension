@@ -193,16 +193,15 @@ regenerated.
 The planes are `static const … SD_PROGMEM`. `SD_PROGMEM` is the library's
 flash-placement macro, in `SD_Config.h`:
 
-- **Teensy 4.x:** `PROGMEM`. The core's linker would otherwise copy const
-  data into RAM (DTCM) at boot; with it the planes stay in flash and the
-  blit reads them there through plain pointers (the flash is memory-mapped,
-  so there is no `pgm_read_*` anywhere).
-- **ESP32, STM32, RP2350 and the host:** empty. These map const data into
-  flash natively (the host has no flash; the arrays are ordinary consts).
+- **Teensy:** `PROGMEM`. Teensy 4's linker would otherwise copy const data
+  into RAM (DTCM) at boot; with it the planes stay in flash and the blit
+  reads them there through plain pointers (the flash is memory-mapped, so
+  there is no `pgm_read_*` anywhere).
+- **Any other board, and the host:** empty, so the planes go wherever that
+  toolchain puts const data.
 
-So a sprite's two planes, `2 x (w + 7) / 8 x h` bytes (a 32x32 sprite is 256
-B), cost flash, not RAM. The 16 B `SD_Sprite` view beside them is plain
-`static const`, so on Teensy 4.x the view itself sits in RAM.
+The `SD_Sprite` view beside them is plain `static const`, so on Teensy 4
+the view itself sits in RAM. Their sizes are in [memory.md](memory.md).
 
 ## Multiple sprites, multiple headers
 
