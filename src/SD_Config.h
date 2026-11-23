@@ -2,13 +2,20 @@
 #ifndef SD_CONFIG_H
 #define SD_CONFIG_H
 
-// library-wide configuration: the avr guard, the version and the
+// library-wide configuration: the avr and c++14 guards, the version and the
 // flash-placement macro. every header includes this one.
 
 // avr is refused: the library is written for 32-bit boards and draws every
 // pixel with float math. no other board is checked.
 #if defined(__AVR__)
 #error "SecondDimension needs a 32-bit board with a C++14 compiler. AVR is not supported."
+#endif
+
+// a compiler older than c++14 is refused too: SD_Bone's default scale makes
+// a bone table something c++11 will not build, and the arduino samd core
+// compiles as c++11.
+#if !defined(__AVR__) && __cplusplus < 201402L
+#error "SecondDimension needs a C++14 compiler, and this board's core builds as C++11 (the Arduino SAMD core does). In PlatformIO: build_unflags = -std=gnu++11 and build_flags = -std=gnu++14."
 #endif
 
 #define SECONDDIMENSION_VERSION_MAJOR 0

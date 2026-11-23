@@ -15,8 +15,10 @@ See it running at https://dangelo.engineering (Daedalus there is posed and drawn
   Sketch > Include Library > Add .ZIP Library.
 - **PlatformIO:** `lib_deps = https://github.com/dangelo729/second_dimension.git`
 
-It needs a 32-bit board and a C++14 compiler; AVR is refused. `SecondDimension.h`
-needs no other library. `SecondDimension_GFX.h`, for an Adafruit GFX display, needs
+It needs a 32-bit board and a C++14 compiler; AVR is refused, and so is a core that
+builds as C++11, as Arduino's SAMD boards (the Zero and its relatives) do: in
+PlatformIO, `build_unflags = -std=gnu++11` and `build_flags = -std=gnu++14` build it
+there. `SecondDimension.h` needs no other library. `SecondDimension_GFX.h`, for an Adafruit GFX display, needs
 the Adafruit GFX Library, and the examples also need Adafruit SSD1306.
 
 ## Use
@@ -61,8 +63,9 @@ void loop() {
   sprite; an `SD_Rig`'s `pose()` places them and its `draw(target)` draws them in order.
 - **IK:** `sd_ik2(l1, l2, tx, ty, bendSign, a1, a2)` sets the angles that put a two-bone
   chain's tip on a point, and returns whether it reached.
-- **Group:** `sd_drawGroup(target, rig, bones, list, n, shape, ink)` draws the listed
-  bones as one shape with one outline; mark them invisible so `draw()` skips them.
+- **Group:** `sd_drawGroup(target, rig, table, bones, n, silhouette, ink)` draws the
+  `n` bones listed in `bones` (their places in the rig's `table`) as one shape with one
+  outline, through two scratch canvases; mark them invisible so `draw()` skips them.
 - **Canvas:** `SD_Canvas(buffer, w, h)`, a 1-bit framebuffer in `drawBitmap`'s layout.
 - **Target:** `SD_GFXTarget(display)` for any Adafruit GFX display, or a subclass of
   `SD_Target` (`width()`, `height()`, `plot(x, y, on)`) for anything else.
