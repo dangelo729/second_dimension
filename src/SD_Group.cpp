@@ -76,11 +76,11 @@ void sd_stampOutline(SD_Target &target, const SD_Canvas &silhouette, const SD_Ca
   }
 }
 
-bool sd_drawGroup(SD_Target &target, const SD_Rig &rig, const SD_Bone *table, const int *bones,
-                  int n, SD_Canvas &silhouette, SD_Canvas &ink, SD_Sample sample) {
-  if (table == nullptr || bones == nullptr || n < 0) return false;
+bool sd_drawGroup(SD_Target &target, const SD_Rig &rig, const int *list, int n,
+                  SD_Canvas &silhouette, SD_Canvas &ink, SD_Sample sample) {
+  if (list == nullptr || n < 0) return false;
   for (int k = 0; k < n; ++k)
-    if (sdIsZero(rig.world(bones[k]))) return false;
+    if (list[k] < 0 || list[k] >= rig.posed_) return false;
 
   // the box: every listed bone's, clipped to the target and both canvases,
   // cleared grown by two (the stamp reads a pixel's neighbours' neighbours)
@@ -90,10 +90,10 @@ bool sd_drawGroup(SD_Target &target, const SD_Rig &rig, const SD_Bone *table, co
   bool any = false;
   int x0 = 0, y0 = 0, x1 = 0, y1 = 0;
   for (int k = 0; k < n; ++k) {
-    const SD_Sprite *s = table[bones[k]].sprite;
+    const SD_Sprite *s = rig.bones_[list[k]].sprite;
     float bx0, by0, bx1, by1;
     if (s == nullptr || !sd_validateSprite(*s) ||
-        !boxOf(*s, rig.world(bones[k]), bx0, by0, bx1, by1))
+        !boxOf(*s, rig.world(list[k]), bx0, by0, bx1, by1))
       continue;
     x0 = any ? mini(x0, (int)bx0) : (int)bx0;
     y0 = any ? mini(y0, (int)by0) : (int)by0;
@@ -113,9 +113,9 @@ bool sd_drawGroup(SD_Target &target, const SD_Rig &rig, const SD_Bone *table, co
       }
   }
   for (int k = 0; k < n; ++k) {
-    const SD_Sprite *s = table[bones[k]].sprite;
+    const SD_Sprite *s = rig.bones_[list[k]].sprite;
     if (s == nullptr) continue;
-    const SD_Xform &m = rig.world(bones[k]);
+    const SD_Xform &m = rig.world(list[k]);
     ok = sd_drawSilhouette(silhouette, *s, m, sample) && ok;
     ok = sd_drawInk(ink, *s, m, sample) && ok;
   }

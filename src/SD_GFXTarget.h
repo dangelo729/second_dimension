@@ -17,6 +17,9 @@
 // sprites on any adafruit_gfx display through drawPixel: a lit plot draws
 // the lit colour, a dark plot the dark one. lit and dark default to 1 and 0,
 // every mono driver's white and black; on a colour panel any two colours.
+// a colour tft driver keeps no copy of the screen in the board's ram, so
+// there each plot is a bus transaction of its own, much slower than on a
+// buffered mono display.
 //
 // width() and height() are read from the gfx object on every call, so the
 // target can be built before display.begin() and follows setRotation().

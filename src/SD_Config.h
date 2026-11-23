@@ -11,11 +11,12 @@
 #error "SecondDimension needs a 32-bit board with a C++14 compiler. AVR is not supported."
 #endif
 
-// a compiler older than c++14 is refused too: SD_Bone's default scale makes
-// a bone table something c++11 will not build, and the arduino samd core
-// compiles as c++11.
+// a build older than c++14 is refused too: SD_Bone's default scale makes a
+// bone table something c++11 will not build. some arduino cores build as
+// c++11; in platformio, build_unflags = -std=gnu++11 and build_flags =
+// -std=gnu++14 build the library on a core that passes -std=gnu++11.
 #if !defined(__AVR__) && __cplusplus < 201402L
-#error "SecondDimension needs a C++14 compiler, and this board's core builds as C++11 (the Arduino SAMD core does). In PlatformIO: build_unflags = -std=gnu++11 and build_flags = -std=gnu++14."
+#error "SecondDimension needs C++14 or later, and this build is older. In PlatformIO, for a core that passes -std=gnu++11: build_unflags = -std=gnu++11 and build_flags = -std=gnu++14."
 #endif
 
 #define SECONDDIMENSION_VERSION_MAJOR 0

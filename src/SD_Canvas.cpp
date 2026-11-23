@@ -5,7 +5,9 @@
 #include <string.h>
 
 SD_Canvas::SD_Canvas(uint8_t *buffer, int16_t w, int16_t h)
-    : buf_(buffer), w_(w > 0 ? w : 0), h_(h > 0 ? h : 0) {}
+    : buf_(buffer),
+      w_(buffer != nullptr && w > 0 ? w : 0),
+      h_(buffer != nullptr && h > 0 ? h : 0) {}
 
 void SD_Canvas::plot(int16_t x, int16_t y, bool on) {
   if (x < 0 || y < 0 || x >= w_ || y >= h_) return;
@@ -17,7 +19,9 @@ void SD_Canvas::plot(int16_t x, int16_t y, bool on) {
     cell = (uint8_t)(cell & ~bit);
 }
 
-void SD_Canvas::clear(bool on) { memset(buf_, on ? 0xff : 0x00, bytes()); }
+void SD_Canvas::clear(bool on) {
+  if (buf_ != nullptr) memset(buf_, on ? 0xff : 0x00, bytes());
+}
 
 bool SD_Canvas::pixel(int16_t x, int16_t y) const {
   if (x < 0 || y < 0 || x >= w_ || y >= h_) return false;

@@ -9,8 +9,8 @@ rigs and canvases are arrays the sketch owns. Sizes are for a 32-bit board.
 | an `SD_Sprite` view | 16 B |
 | an `SD_Bone` | 28 B |
 | an `SD_Xform`, one per bone | 24 B |
-| an `SD_Rig` | 12 B |
-| an `SD_Canvas` buffer | `(w + 7) / 8 x h` bytes: 1 KB at 128x64 |
+| an `SD_Rig` | 16 B |
+| an `SD_Canvas` buffer | `SD_Canvas::bytesFor(w, h)`, `(w + 7) / 8 x h` bytes: 1 KB at 128x64 |
 
 So twenty bones and their transforms are about 1 KB.
 
@@ -18,7 +18,9 @@ So twenty bones and their transforms are about 1 KB.
 
 - `sd_draw` visits every pixel of the sprite's turned box, clipped to the
   target, and reads up to four samples in each (one under `SD_SAMPLE_1`). A
-  20x20 sprite at 45 degrees has a box of about 30x30, 900 pixels.
+  20x20 sprite at 45 degrees has a box of about 30x30, 900 pixels. Each
+  sample is a float affine and two `floorf`, which a board with no FPU does
+  in software, many times slower.
 - `pose()` is one `SD_Xform::scaled` and one `compose` per bone.
 - `sd_drawGroup` is two `sd_draw`s per bone, one for the shape and one for
   the ink, then a clear and a stamp of the group's box. Its two scratch

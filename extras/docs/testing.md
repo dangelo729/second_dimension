@@ -1,8 +1,8 @@
 # Testing
 
 The core needs no Arduino header off a board, so the whole suite runs on a
-host PC, with a C++17 compiler, `make` and Python 3.9 or later (the
-converter's tests run `tools/png2sprite.py`):
+host PC, with clang++ (`CXX=` names another C++17 compiler), `make` and
+Python 3.9 or later (the converter's tests run `tools/png2sprite.py`):
 
 ```sh
 make -C test/host run

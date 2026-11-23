@@ -37,19 +37,19 @@ void sd_stampOutline(SD_Target &target, const SD_Canvas &silhouette, const SD_Ca
                      int y0, int x1, int y1);
 
 // draws n bones of a posed rig as one group, each bone's sprite through its
-// world transform. table is the bone array the rig was built over (the rig
-// does not hand out its bones), and bones lists n indices into it. a
-// listed bone's visible flag is not read: mark a group's bones invisible so
-// the rig's own draw leaves them to the group. silhouette and ink are two
+// world transform; list holds the n bones' indices in the rig's bone array.
+// a listed bone's visible flag is not read: mark a group's bones invisible
+// so the rig's own draw leaves them to the group. silhouette and ink are two
 // scratch canvases the target's size; only the group's box (grown by two
 // pixels) is cleared and drawn in them, so groups drawn one after another
 // can share them. never allocates.
 //
-// returns false, drawing nothing, for a null pointer, a negative count or a
-// listed bone the rig has not posed (or outside the rig). returns false,
-// leaving that piece out, for a piece sd_draw refuses (a bad sprite, or a
-// bone of scale 0 or below); true otherwise.
-bool sd_drawGroup(SD_Target &target, const SD_Rig &rig, const SD_Bone *table, const int *bones,
-                  int n, SD_Canvas &silhouette, SD_Canvas &ink, SD_Sample sample = SD_SAMPLE_2x2);
+// returns false, drawing nothing, for a null list, a negative count or a
+// listed bone the rig has not posed (before its first pose(), at or after a
+// bone pose() refused, or outside the rig). returns false, leaving that
+// piece out, for a piece sd_draw refuses (a bad sprite, or a bone of scale 0
+// or below); true otherwise.
+bool sd_drawGroup(SD_Target &target, const SD_Rig &rig, const int *list, int n,
+                  SD_Canvas &silhouette, SD_Canvas &ink, SD_Sample sample = SD_SAMPLE_2x2);
 
 #endif  // SD_GROUP_H

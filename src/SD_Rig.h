@@ -10,6 +10,8 @@
 #include "SD_Target.h"
 #include "SD_Xform.h"
 
+class SD_Canvas;
+
 // one bone of a rig: a sprite, or a pure joint with none, hung from its
 // parent and scaled and turned about its own pivot. a plain aggregate, so a
 // rig is an initializer table, parents first. scale may be left out of a
@@ -64,9 +66,14 @@ class SD_Rig {
   const SD_Xform &world(int i) const;
 
  private:
+  // the group reads the bones' sprites and which bones pose() has placed.
+  friend bool sd_drawGroup(SD_Target &, const SD_Rig &, const int *, int, SD_Canvas &, SD_Canvas &,
+                           SD_Sample);
+
   const SD_Bone *bones_;
   SD_Xform *world_;
   int count_;
+  int posed_;  // bones [0, posed_) are posed
 };
 
 #endif  // SD_RIG_H

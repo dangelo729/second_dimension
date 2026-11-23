@@ -10,13 +10,20 @@
 
 // a 1-bit framebuffer target over a caller-owned buffer, in drawBitmap's row
 // layout (the sprite planes' layout): (w + 7) / 8 bytes per row, msb first,
-// 1 = lit. the buffer must hold at least bytes() bytes; the canvas never
-// allocates. on a board it is an off-screen buffer a sketch can hand to
+// 1 = lit. the buffer must hold at least bytesFor(w, h) bytes; the canvas
+// never allocates. on a board it is an off-screen buffer a sketch can hand to
 // drawBitmap; in the host suite it is the canvas every frame is hashed from.
 class SD_Canvas : public SD_Target {
  public:
-  // a negative size is taken as zero.
+  // a negative size is taken as zero, and so is any size over a null buffer:
+  // such a canvas plots nothing and reads dark.
   SD_Canvas(uint8_t *buffer, int16_t w, int16_t h);
+
+  // the bytes a w x h canvas's buffer needs, a constant expression, so it
+  // can size an array: uint8_t buf[SD_Canvas::bytesFor(128, 64)].
+  static constexpr size_t bytesFor(int16_t w, int16_t h) {
+    return w > 0 && h > 0 ? (size_t)((w + 7) / 8) * (size_t)h : 0;
+  }
 
   int16_t width() const override { return w_; }
   int16_t height() const override { return h_; }

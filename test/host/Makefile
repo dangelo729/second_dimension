@@ -16,7 +16,11 @@
 #
 # the suite is the library's acceptance gate.
 
-CXX ?= clang++
+# make has a CXX of its own (c++); clang++ takes its place unless CXX is set
+# on the command line or in the environment.
+ifeq ($(origin CXX),default)
+CXX := clang++
+endif
 CXXFLAGS := -std=c++17 -O1 -g -Wall -Wextra -ffp-contract=off
 CPPFLAGS := -I../../src
 

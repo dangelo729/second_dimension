@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
-// draw suite: the canvas's layout; identity (angle 0 at an integer position,
+// draw suite: the canvas's layout, its size helper and a null buffer taken
+// as size zero; identity (angle 0 at an integer position,
 // 1x and 2x2, is the art pixel for pixel and equals a drawBitmap-style
 // copy); golden frames of every fixture at the pinned poses; the mockup
 // frame; clipping (half off each edge, wholly off, a 1x1 target,
@@ -307,6 +308,22 @@ void runDrawTests() {
     SD_Canvas neg(nullptr, -4, -4);
     CHECK(neg.width() == 0 && neg.height() == 0 && neg.bytes() == 0,
           "negative canvas size not taken as zero");
+    SD_Canvas none(nullptr, 8, 8);
+    none.plot(1, 1, true);
+    none.clear(true);
+    CHECK(none.width() == 0 && none.height() == 0 && none.bytes() == 0 && !none.pixel(1, 1) &&
+              sd_draw(none, kArm.sprite, SD_Xform::rigid(4.0f, 4.0f, 0.3f)),
+          "a canvas over a null buffer not taken as size zero");
+    // bytesFor is a constant expression, a canvas's bytes() at every size
+    constexpr size_t n13x5 = SD_Canvas::bytesFor(13, 5);
+    uint8_t sized[SD_Canvas::bytesFor(13, 5)];
+    long off = 0;
+    for (int16_t h = -1; h <= 9; ++h)
+      for (int16_t w = -1; w <= 17; ++w)
+        if (SD_Canvas::bytesFor(w, h) != SD_Canvas(sized, w, h).bytes()) ++off;
+    CHECK(n13x5 == 10 && sizeof(sized) == 10 && SD_Canvas::bytesFor(128, 64) == 1024 && off == 0,
+          "bytesFor: 13x5 is %zu, 128x64 %zu, and %ld sizes differ from bytes()", n13x5,
+          SD_Canvas::bytesFor(128, 64), off);
   }
 
   // ---- identity: angle 0 at an integer position is the art, and the gfx copy ----

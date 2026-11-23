@@ -9,7 +9,9 @@
 // (opaque #800080) and left unpainted (either colour at alpha 1..254) leave
 // the shoulder pixel black and clear; reading.png pins the frozen colour
 // reading pixel by pixel; 16-bit, interlaced, unknown-critical-chunk and
-// two-pivot pngs are refused with a message and no output. --silhouette:
+// two-pivot pngs are refused with a message and no output, and so is a
+// sprite named for a c++ keyword (char.png, or --name int); the header
+// declares no license. --silhouette:
 // outlined.png (an opaque rgb drawing of a head, a closed 1 px outline on
 // black touching all four edges, a face inside) converts to the
 // filled shape with only the face in ink, and drawn alone as a group gives
@@ -212,6 +214,8 @@ void runConvertTests() {
     CHECK(ok && got == pinned,
           "arm.png: header differs from fixtures/arm_expected.h (%zu vs %zu bytes)", got.size(),
           pinned.size());
+    CHECK(got.find("SPDX") == std::string::npos,
+          "arm.png: the header declares a license for the art");
   }
 
   // ---- the planes, as the converter writes them, are the ascii arm's ----
@@ -342,6 +346,20 @@ void runConvertTests() {
     }
   }
 
+  // ---- a sprite named for a c++ keyword is refused, by its file or --name ----
+  {
+    std::string err;
+    const int rc = cv.run("char.png", "char.h", "", &err);
+    CHECK(rc != 0 && err.find("c++ keyword") != std::string::npos,
+          "char.png: should be refused as a c++ keyword, converter exited %d: %s", rc, err.c_str());
+    CHECK(!exists(cv.dir + "/char.h"), "char.png: a refused conversion wrote a header");
+    const int rc2 = cv.run("arm.png", "int.h", "--name int", &err);
+    CHECK(rc2 != 0 && err.find("c++ keyword") != std::string::npos,
+          "--name int: should be refused as a c++ keyword, converter exited %d: %s", rc2,
+          err.c_str());
+    CHECK(!exists(cv.dir + "/int.h"), "--name int: a refused conversion wrote a header");
+  }
+
   // ---- several pngs, one header, each named for its file ----
   {
     std::string err;
@@ -402,7 +420,7 @@ void runConvertTests() {
       SD_Xform world[1];
       SD_Rig rig(bone, world, 1);
       const int list[1] = {0};
-      CHECK(rig.pose() && sd_drawGroup(got.canvas, rig, bone, list, 1, sil.canvas, ink.canvas, q),
+      CHECK(rig.pose() && sd_drawGroup(got.canvas, rig, list, 1, sil.canvas, ink.canvas, q),
             "outlined.png --silhouette: the group did not draw");
       writeFrame(got.canvas, qi == 0 ? "convert_silhouette_1" : "convert_silhouette_2x2");
       CHECK(memcmp(want.canvas.buffer(), got.canvas.buffer(), want.canvas.bytes()) == 0,

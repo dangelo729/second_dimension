@@ -13,12 +13,13 @@ bool sd_validateRig(const SD_Bone *bones, int count) {
 }
 
 SD_Rig::SD_Rig(const SD_Bone *bones, SD_Xform *world, int count)
-    : bones_(bones), world_(world), count_(count > 0 ? count : 0) {
+    : bones_(bones), world_(world), count_(count > 0 ? count : 0), posed_(0) {
   if (world_ != nullptr)
     for (int i = 0; i < count_; ++i) world_[i] = kSDZero;
 }
 
 bool SD_Rig::pose() {
+  posed_ = 0;
   if (count_ > 0 && (bones_ == nullptr || world_ == nullptr)) return false;
   for (int i = 0; i < count_; ++i) {
     const SD_Bone &b = bones_[i];
@@ -28,6 +29,7 @@ bool SD_Rig::pose() {
     }
     const SD_Xform local = SD_Xform::scaled(b.ox, b.oy, b.angle, b.flipX, b.scale);
     world_[i] = b.parent < 0 ? local : SD_Xform::compose(world_[b.parent], local);
+    posed_ = i + 1;
   }
   return true;
 }

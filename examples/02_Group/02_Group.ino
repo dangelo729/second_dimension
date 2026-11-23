@@ -28,7 +28,7 @@ SD_Rig arm(bones, world, 3);
 
 // the group's bones, and the two scratch canvases it is drawn through
 const int armGroup[] = {0, 1};
-uint8_t shapeBuf[128 / 8 * 64], inkBuf[128 / 8 * 64];
+uint8_t shapeBuf[SD_Canvas::bytesFor(128, 64)], inkBuf[SD_Canvas::bytesFor(128, 64)];
 SD_Canvas shape(shapeBuf, 128, 64), ink(inkBuf, 128, 64);
 
 void setup() { display.begin(SSD1306_SWITCHCAPVCC, 0x3C); }
@@ -40,7 +40,7 @@ void loop() {
   sd_ik2(17.0f, 16.0f + 10.0f, tx, ty, 1.0f, bones[0].angle, bones[1].angle);
   arm.pose();
   display.clearDisplay();
-  sd_drawGroup(target, arm, bones, armGroup, 2, shape, ink);  // the arm, one outline
+  sd_drawGroup(target, arm, armGroup, 2, shape, ink);  // the arm, one outline
   arm.draw(target);  // the visible bones: the mallet, over the arm
   display.display();
 }

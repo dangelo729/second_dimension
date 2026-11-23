@@ -32,7 +32,9 @@ sd_draw(canvas, arm, SD_Xform::rigid(64, 32, 0.3f));
 `--name arm` sets the symbol: the file emits `static const SD_Sprite arm`
 over `arm_ink[]` and `arm_mask[]`, so several sprites coexist in one sketch
 with no macros to collide on. Without `--name`, the sprite is named for its
-file stem, made into a C identifier (`upper-arm.png` → `upper_arm`).
+file stem, made into a C identifier (`upper-arm.png` → `upper_arm`). A name
+that is a C++ keyword (`char.png`, `--name int`) is refused: rename the file
+or give another `--name`.
 
 Several PNGs go into one header, each named for its file:
 
@@ -165,6 +167,8 @@ header written, rather than a misread:
   palette, a palette index past the palette;
 - a second pivot pixel (`#ff00ff` or `#800080` at any alpha but 0);
 - a side over 32767 pixels (`SD_Sprite` sizes are `int16_t`);
+- a sprite name that is a C++ keyword: rename the file, or give another
+  `--name`;
 - under `--silhouette`, nothing left inside an outline (a gap in it), and
   a `--silhouette` PNG that is not among those given.
 

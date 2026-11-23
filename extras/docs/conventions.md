@@ -34,8 +34,10 @@ the nearest sprite pixel with `floorf(u + 0.5f)`. So a sprite at angle 0 at
 an integer position reproduces the art pixel for pixel, and at 90, 180 and
 270 degrees it is the art turned, exactly, under either sampling. At other
 angles one sample a pixel (`SD_SAMPLE_1`, nearest neighbour) leaves gaps in
-1 px lines; four (`SD_SAMPLE_2x2`, the default) keep them whole at the cost
-of a little weight.
+1 px lines; four (`SD_SAMPLE_2x2`, the default) keep them whole but draw
+them bolder: a turned 1 px outline mostly comes out 2 px wide, and the
+examples' sprites turned 5 to 85 degrees light 1.6 to 1.7 times their art's
+ink pixels.
 
 *If you assume otherwise:* treating integers as pixel corners puts every
 part half a pixel off, and an unturned sprite placed at a half-integer

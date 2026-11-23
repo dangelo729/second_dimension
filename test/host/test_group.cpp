@@ -9,7 +9,8 @@
 // refusals; golden frames of a two-segment arm with a round elbow disc at
 // pinned poses; and that arm through a root of scale 0.9 and 1.1, one shape
 // with one 1 px outline at every pose (the outline is derived after the
-// scale), pinned, and a piece of scale 0 left out of its group.
+// scale), pinned, and a piece of scale 0 left out of its group, even one
+// posed onto (0, 0).
 
 #include <math.h>
 #include <string.h>
@@ -130,7 +131,7 @@ bool groupOfOne(SD_Target &t, const SD_Sprite &s, float x, float y, float deg, S
   SD_Rig rig(bones, world, 1);
   rig.pose();
   const int list[1] = {0};
-  return sd_drawGroup(t, rig, bones, list, 1, sil, ink, q);
+  return sd_drawGroup(t, rig, list, 1, sil, ink, q);
 }
 
 // the arm: a segment at the shoulder, the disc on its far pin, a second
@@ -199,8 +200,8 @@ uint64_t armHash(int p, SD_Sample q, const char *label, float scale = 1.0f) {
   rig.pose();
   const int list[3] = {0, 1, 2};
   Record td(dark.canvas), tl(lit.canvas);
-  const bool ok1 = sd_drawGroup(td, rig, b, list, 3, sil.canvas, ink.canvas, q);
-  const bool ok2 = sd_drawGroup(tl, rig, b, list, 3, sil.canvas, ink.canvas, q);
+  const bool ok1 = sd_drawGroup(td, rig, list, 3, sil.canvas, ink.canvas, q);
+  const bool ok2 = sd_drawGroup(tl, rig, list, 3, sil.canvas, ink.canvas, q);
   CHECK(ok1 && ok2 && td.oob == 0 && tl.oob == 0, "%s: drawn %d %d, out of bounds %ld %ld", label,
         ok1, ok2, td.oob, tl.oob);
   char name[96];
@@ -306,7 +307,7 @@ void runGroupTests() {
     SD_Rig rig(bones, world, 2);
     rig.pose();
     const int list[2] = {0, 1};
-    CHECK(sd_drawGroup(got.canvas, rig, bones, list, 2, sil.canvas, ink.canvas, SD_SAMPLE_1),
+    CHECK(sd_drawGroup(got.canvas, rig, list, 2, sil.canvas, ink.canvas, SD_SAMPLE_1),
           "two blocks: group refused");
     auto inUnion = [](int x, int y) {
       return (x >= 10 && x <= 17 && y >= 6 && y <= 10) || (x >= 14 && x <= 21 && y >= 8 && y <= 12);
@@ -399,7 +400,7 @@ void runGroupTests() {
             sd_drawSilhouette(shape.canvas, *b[i].sprite, rig.world(i), q);
           const int list[3] = {0, 1, 2};
           Record r(got.canvas);
-          sd_drawGroup(r, rig, b, list, 3, sil.canvas, ink.canvas, q);
+          sd_drawGroup(r, rig, list, 3, sil.canvas, ink.canvas, q);
           oob += r.oob;
           for (int16_t y = 0; y < kArmH; ++y)
             for (int16_t x = 0; x < kArmW; ++x)
@@ -430,20 +431,24 @@ void runGroupTests() {
     SD_Rig rig(bones, world, 2);
     const int one[1] = {0}, past[2] = {0, 2}, before[1] = {-1};
     Record r(got.canvas);
-    CHECK(!sd_drawGroup(r, rig, bones, one, 1, sil.canvas, ink.canvas),
+    CHECK(!sd_drawGroup(r, rig, one, 1, sil.canvas, ink.canvas),
           "an unposed rig not refused");
     rig.pose();
-    CHECK(!sd_drawGroup(r, rig, nullptr, one, 1, sil.canvas, ink.canvas) &&
-              !sd_drawGroup(r, rig, bones, nullptr, 1, sil.canvas, ink.canvas) &&
-              !sd_drawGroup(r, rig, bones, one, -1, sil.canvas, ink.canvas) &&
-              !sd_drawGroup(r, rig, bones, past, 2, sil.canvas, ink.canvas) &&
-              !sd_drawGroup(r, rig, bones, before, 1, sil.canvas, ink.canvas),
-          "a null pointer, a negative count or an index outside the rig not refused");
+    SD_Xform nw[2];
+    SD_Rig noBones(nullptr, nw, 2);
+    noBones.pose();
+    CHECK(!sd_drawGroup(r, noBones, one, 1, sil.canvas, ink.canvas) &&
+              !sd_drawGroup(r, rig, nullptr, 1, sil.canvas, ink.canvas) &&
+              !sd_drawGroup(r, rig, one, -1, sil.canvas, ink.canvas) &&
+              !sd_drawGroup(r, rig, past, 2, sil.canvas, ink.canvas) &&
+              !sd_drawGroup(r, rig, before, 1, sil.canvas, ink.canvas),
+          "a rig over no bones, a null list, a negative count or an index outside the rig not "
+          "refused");
     long touched = 0;
     for (int16_t y = 0; y < 12; ++y)
       for (int16_t x = 0; x < 16; ++x) touched += r.at(x, y) != 0;
     CHECK(touched == 0, "a refused group drew %ld pixels", touched);
-    CHECK(sd_drawGroup(r, rig, bones, past, 0, sil.canvas, ink.canvas), "an empty group refused");
+    CHECK(sd_drawGroup(r, rig, past, 0, sil.canvas, ink.canvas), "an empty group refused");
     SD_Sprite broken = kBlock.sprite;
     broken.h = 0;
     const SD_Bone mixed[2] = {{-1, 6.0f, 6.0f, 0.0f, false, false, &kBlock.sprite},
@@ -452,7 +457,7 @@ void runGroupTests() {
     SD_Rig mrig(mixed, mw, 2);
     mrig.pose();
     const int both[2] = {0, 1};
-    CHECK(!sd_drawGroup(r, mrig, mixed, both, 2, sil.canvas, ink.canvas) && r.at(8, 6) == 1 &&
+    CHECK(!sd_drawGroup(r, mrig, both, 2, sil.canvas, ink.canvas) && r.at(8, 6) == 1 &&
               r.at(6, 4) == 2,
           "a group with a bad sprite: not false, or its good piece not drawn");
   }
@@ -499,7 +504,7 @@ void runGroupTests() {
           }
           const int list[3] = {0, 1, 2};
           Record r(got.canvas);
-          sd_drawGroup(r, rig, b, list, 3, sil.canvas, ink.canvas, q);
+          sd_drawGroup(r, rig, list, 3, sil.canvas, ink.canvas, q);
           for (int y = 0; y < kArmH; ++y)
             for (int x = 0; x < kArmW; ++x) {
               const bool in = inShape(shape.canvas, x, y);
@@ -579,12 +584,42 @@ void runGroupTests() {
     SD_Rig rig(b, world, 3);
     rig.pose();
     const int two[2] = {0, 1}, all[3] = {0, 1, 2};
-    CHECK(sd_drawGroup(want.canvas, rig, b, two, 2, sil.canvas, ink.canvas),
+    CHECK(sd_drawGroup(want.canvas, rig, two, 2, sil.canvas, ink.canvas),
           "the arm's first two pieces: group refused");
     b[2].scale = 0.0f;
     rig.pose();
-    CHECK(!sd_drawGroup(got.canvas, rig, b, all, 3, sil.canvas, ink.canvas) &&
+    CHECK(!sd_drawGroup(got.canvas, rig, all, 3, sil.canvas, ink.canvas) &&
               memcmp(got.canvas.buffer(), want.canvas.buffer(), got.canvas.bytes()) == 0,
           "a group with a piece of scale 0: not false, or not its other pieces alone");
+  }
+
+  // ---- a piece of scale 0 posed onto (0, 0), its world matrix all zero, is posed:
+  // left out, the rest drawn; a bone pose() refused, and those after it, are not ----
+  {
+    OwnedCanvas got(kArmW, kArmH), want(kArmW, kArmH), sil(kArmW, kArmH), ink(kArmW, kArmH);
+    got.canvas.clear(false);
+    want.canvas.clear(false);
+    SD_Bone b[3] = {{-1, 0.0f, 0.0f, 0.0f, false, false, &kSeg.sprite, 0.0f},
+                    {-1, 30.0f, 30.0f, degToRad(20.0f), false, false, &kSeg.sprite},
+                    {-1, 40.0f, 20.0f, 0.0f, false, false, &kBlock.sprite}};
+    SD_Xform world[3];
+    SD_Rig rig(b, world, 3);
+    rig.pose();
+    const int one[1] = {1}, both[2] = {0, 1}, last[1] = {2};
+    CHECK(sd_drawGroup(want.canvas, rig, one, 1, sil.canvas, ink.canvas),
+          "a lone segment: group refused");
+    CHECK(!sd_drawGroup(got.canvas, rig, both, 2, sil.canvas, ink.canvas) &&
+              memcmp(got.canvas.buffer(), want.canvas.buffer(), got.canvas.bytes()) == 0,
+          "a group with a piece of scale 0 at (0, 0): not false, or not its other piece alone");
+    b[1].parent = 1;
+    got.canvas.clear(false);
+    Record r(got.canvas);
+    CHECK(!rig.pose() && !sd_drawGroup(r, rig, one, 1, sil.canvas, ink.canvas) &&
+              !sd_drawGroup(r, rig, last, 1, sil.canvas, ink.canvas),
+          "a bone pose() refused, or one after it, not refused by the group");
+    long touched = 0;
+    for (int16_t y = 0; y < kArmH; ++y)
+      for (int16_t x = 0; x < kArmW; ++x) touched += r.at(x, y) != 0;
+    CHECK(touched == 0, "a group of bones pose() refused drew %ld pixels", touched);
   }
 }

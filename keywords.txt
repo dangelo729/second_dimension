@@ -42,6 +42,7 @@ pixel	KEYWORD2
 stride	KEYWORD2
 buffer	KEYWORD2
 bytes	KEYWORD2
+bytesFor	KEYWORD2
 pose	KEYWORD2
 draw	KEYWORD2
 world	KEYWORD2

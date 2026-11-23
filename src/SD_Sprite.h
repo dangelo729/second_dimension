@@ -32,9 +32,9 @@ struct SD_Sprite {
   const uint8_t *mask;      // same layout; 1 = this pixel is painted
 };
 
-// one-time structural check: both planes non-null, w and h at least 1, the
-// pivot inside [0, w) x [0, h). sd_draw runs it on every call, since it
-// costs a handful of compares.
+// the structural check: both planes non-null, w and h at least 1, the pivot
+// inside [0, w) x [0, h). it costs a handful of compares, and sd_draw runs
+// it on every call.
 bool sd_validateSprite(const SD_Sprite &s);
 
 // reads pixel (x, y): returns whether it is masked and sets ink to its ink
