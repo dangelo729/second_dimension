@@ -8,6 +8,33 @@ Before 1.0, a minor release may change what an existing sketch must say or what 
 draws; each such change is listed under "Breaking". A change to the sprite layout is a
 new sprite format number, which a header made for the old one refuses at compile time.
 
+## [0.4.0] - 2026-11-23
+
+### Breaking
+
+- **`sd_drawGroup` no longer takes the bone table**: it reads the bones from the rig.
+  The call is `sd_drawGroup(target, rig, list, n, silhouette, ink)`; take the table out
+  of an existing one.
+
+### Added
+
+- **`SD_Canvas::bytesFor(w, h)`**: the bytes a canvas's buffer needs, a constant
+  expression, so it can size an array.
+
+### Changed
+
+- **The converter's headers declare no licence**: the art is yours.
+- **The C++14 error and the README speak of any core that builds as C++11.**
+- **`SD_Rig` is 16 bytes**, from 12.
+
+### Fixed
+
+- **A group with a bone of scale 0 whose pivot lands on (0, 0)** leaves that piece out
+  and draws the rest; it used to draw nothing.
+- **A canvas over a null buffer** draws nothing; it used to crash.
+- **The converter refuses a sprite named for a C++ keyword**, whose header would not
+  compile.
+
 ## [0.3.0] - 2026-11-23
 
 The first release.
