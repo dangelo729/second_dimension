@@ -10,7 +10,7 @@ explaining why the pins moved, and any change to the `SD_Sprite` layout is a new
 format number plus a MAJOR bump. During 0.x, MINOR releases may break API; breaks are
 called out under a "Breaking" heading.
 
-## [0.3.0] - unreleased
+## [0.3.0] - 2026-11-23
 
 ### Added
 
@@ -59,8 +59,9 @@ called out under a "Breaking" heading.
 - **`01_Arm`** is the README's sketch.
 - **The PlatformIO package ships `tools/`**, so `tools/png2sprite.py` comes with the
   library.
-- **The AVR `#error`** asks for a 32-bit board with a C++14 compiler. Only AVR is
-  refused; no other board is checked.
+- **The AVR `#error`** asks for a 32-bit board with a C++14 compiler, and a second
+  `#error` refuses a compiler older than C++14 (the Arduino SAMD core builds as
+  C++11), saying what to set in PlatformIO. No other board is checked.
 - **`SD_Draw.cpp`, `SD_Group.cpp`, `SD_Rig.cpp` and `SD_Xform.cpp`** share the box
   and the zero matrix through `src/SD_Internal.h`. No pin moved.
 
